@@ -4,14 +4,13 @@
   <groupId>org.hpccsystems.hpccjapi</groupId>
   <artifactId>hpcc-japi</artifactId>
   <packaging>pom</packaging>
-  <version>0.3-SNAPSHOT</version>
+  <version>0.4-SNAPSHOT</version>
   <name>HPCC Java APIs</name>
   <url>https://github.com/hpcc-systems/HPCC-JAPIs</url>
 
   <modules>
-    <module>org.hpccsystems.clienttools</module>
     <module>org.hpccsystems.ws.client</module>
-    <module>org.hpccsystems.ws.client.legacy</module>
+    <module>org.hpccsystems.clienttools</module>
     <module>org.hpccsystems.rdf.rdf2hpcc</module>
   </modules>
 
@@ -26,6 +25,16 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>2.5</version>
+          <configuration>
+            <descriptors>
+             <descriptor>assembly.xml</descriptor>
+             <descriptor>assembly_with_dependencies.xml</descriptor>
+            </descriptors>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
