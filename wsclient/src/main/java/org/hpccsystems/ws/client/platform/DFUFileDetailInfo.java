@@ -13,8 +13,8 @@ import org.hpccsystems.ws.client.antlr.EclRecordLexer;
 import org.hpccsystems.ws.client.antlr.EclRecordParser;
 import org.hpccsystems.ws.client.antlr.EclRecordParser.ProgramContext;
 import org.hpccsystems.ws.client.antlr.EclRecordReader;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUDataColumn;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUFileDetail;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUDataColumn;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUFileDetail;
 import org.hpccsystems.ws.client.utils.FileFormat;
 import org.hpccsystems.ws.client.platform.DFUFilePartsOnClusterInfo;
 
@@ -86,9 +86,9 @@ public class DFUFileDetailInfo extends DFUFileDetail
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("ActualSize:").append(this.getActualSize()).append("\n");
+        //sb.append("ActualSize:").append(this.getActualSize()).append("\n");
         sb.append("BrowseData:").append(this.getBrowseData()).append("\n");
-        sb.append("Cluster:").append(this.getCluster()).append("\n");
+        //sb.append("Cluster:").append(this.getCluster()).append("\n");
         sb.append("CompressedFileSize:").append(this.getCompressedFileSize()).append("\n");
         sb.append("ContentType:").append(this.getContentType()).append("\n");
         sb.append("CsvEscape:").append(this.getCsvEscape()).append("\n");
@@ -96,7 +96,7 @@ public class DFUFileDetailInfo extends DFUFileDetail
         sb.append("CsvSeparate:").append(this.getCsvSeparate()).append("\n");
         sb.append("CsvTerminate:").append(this.getCsvTerminate()).append("\n");
         sb.append("Description:").append(this.getDescription()).append("\n");
-        sb.append("DFUFileParts:").append(this.getDFUFileParts()).append("\n");
+        //sb.append("DFUFileParts:").append(this.getDFUFileParts()).append("\n");
         sb.append("DFUFilePartsOnClusters:").append(this.getDFUFilePartsOnClusters()).append("\n");
         sb.append("Dir:").append(this.getDir()).append("\n");
         sb.append("Ecl:").append(this.getEcl()).append("\n");
@@ -127,7 +127,7 @@ public class DFUFileDetailInfo extends DFUFileDetail
         sb.append("Superfiles:").append(this.getSuperfiles()).append("\n");
         sb.append("UserPermission:").append(this.getUserPermission()).append("\n");
         sb.append("Wuid:").append(this.getWuid()).append("\n");
-        sb.append("ZipFile:").append(this.getZipFile()).append("\n");
+        //sb.append("ZipFile:").append(this.getZipFile()).append("\n");
         sb.append("Columns:");
         for (DFUDataColumnInfo col : this.getColumns())
         {
@@ -147,9 +147,9 @@ public class DFUFileDetailInfo extends DFUFileDetail
         {
             return;
         }
-        this.setActualSize(base.getActualSize());
+        //this.setActualSize(base.getActualSize());
         this.setBrowseData(base.getBrowseData());
-        this.setCluster(base.getCluster());
+        //this.setCluster(base.getCluster());
         this.setCompressedFileSize(base.getCompressedFileSize());
         this.setContentType(base.getContentType());
         this.setCsvEscape(base.getCsvEscape());
@@ -157,7 +157,7 @@ public class DFUFileDetailInfo extends DFUFileDetail
         this.setCsvSeparate(base.getCsvSeparate());
         this.setCsvTerminate(base.getCsvTerminate());
         this.setDescription(base.getDescription());
-        this.setDFUFileParts(base.getDFUFileParts());
+        //this.setDFUFileParts(base.getDFUFileParts());
         this.setDFUFilePartsOnClusters(base.getDFUFilePartsOnClusters());
         this.setDir(base.getDir());
         this.setEcl(base.getEcl());
@@ -186,7 +186,7 @@ public class DFUFileDetailInfo extends DFUFileDetail
         this.setSuperfiles(base.getSuperfiles());
         this.setUserPermission(base.getUserPermission());
         this.setWuid(base.getWuid());
-        this.setZipFile(base.getZipFile());
+        //this.setZipFile(base.getZipFile());
     }
 
     /**
