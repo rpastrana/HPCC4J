@@ -32,9 +32,9 @@ public class DFULogicalFileInfo {
     private String clusterName;
     private Boolean browseData;
 
-    public DFULogicalFileInfo(org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFULogicalFile raw) {
+    public DFULogicalFileInfo(org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFULogicalFile raw) {
         browseData=raw.getBrowseData();
-        clusterName=raw.getClusterName();
+        //clusterName=raw.getClusterName();
         compressedFileSize=raw.getCompressedFileSize();
         contentType=raw.getContentType();
         description=raw.getDescription();
@@ -44,10 +44,10 @@ public class DFULogicalFileInfo {
         intSize=raw.getIntSize();
         isCompressed=raw.getIsCompressed();
         isDirectory=raw.getIsDirectory();
-        isKeyFile=raw.getIsKeyFile();
+        //isKeyFile=raw.getIsKeyFile();
         isProtected=raw.getIsProtected();
         isSuperfile=raw.getIsSuperfile();
-        isZipfile=raw.getIsZipfile();
+        //isZipfile=raw.getIsZipfile();
         longRecordCount=raw.getLongRecordCount();
         longSize=raw.getLongSize();
         modified=raw.getModified();
