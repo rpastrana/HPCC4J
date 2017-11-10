@@ -14,31 +14,31 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.axis.client.Stub;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.ArrayOfEspException;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUActionInfo;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUArrayActionRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUArrayActionResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUArrayActions;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUBrowseDataRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUBrowseDataResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUDataColumn;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUFileViewRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUFileViewResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUGetDataColumnsRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUGetDataColumnsResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUGetFileMetaDataRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUGetFileMetaDataResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUInfoRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUInfoResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFULogicalFile;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUQueryRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUQueryResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUSearchDataRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUSearchDataResponse;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.EspException;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.WsDfuLocator;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.WsDfuServiceSoap;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.WsDfuServiceSoapProxy;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.ArrayOfEspException;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUActionInfo;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUArrayActionRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUArrayActionResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUArrayActions;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUBrowseDataRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUBrowseDataResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUDataColumn;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUFileViewRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUFileViewResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUGetDataColumnsRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUGetDataColumnsResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUGetFileMetaDataRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUGetFileMetaDataResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUInfoRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUInfoResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFULogicalFile;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUQueryRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUQueryResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUSearchDataRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUSearchDataResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.EspException;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.WsDfuLocator;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.WsDfuServiceSoap;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.WsDfuServiceSoapProxy;
 import org.hpccsystems.ws.client.platform.DFUDataColumnInfo;
 import org.hpccsystems.ws.client.platform.DFUFileDetailInfo;
 import org.hpccsystems.ws.client.platform.DFUResult;
@@ -725,7 +725,8 @@ public class HPCCWsDFUClient extends DataSingleton
             if ((info.getEcl() == null || info.getEcl().isEmpty()) && info.getIsSuperfile()
                     && info.getSubfiles() != null && info.getSubfiles().length != 0)
             {
-                DFUFileDetailInfo subfile = this.getFileDetails(info.getSubfiles()[0], info.getCluster());
+                //DFUFileDetailInfo subfile = this.getFileDetails(info.getSubfiles()[0], info.getCluster());
+                DFUFileDetailInfo subfile = this.getFileDetails(info.getSubfiles()[0], "");
                 if (subfile != null)
                 {
                     info.setEcl(subfile.getEcl());

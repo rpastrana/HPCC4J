@@ -17,7 +17,7 @@ import org.hpccsystems.ws.client.extended.HPCCWsAttributesClient;
 import org.hpccsystems.ws.client.extended.HPCCWsSQLClient;
 import org.hpccsystems.ws.client.gen.extended.wssql.v3_05.ExecuteSQLResponse;
 import org.hpccsystems.ws.client.gen.filespray.v1_15.PhysicalFileStruct;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUDataColumn;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUDataColumn;
 import org.hpccsystems.ws.client.gen.wsworkunits.v1_69.WUPublishWorkunitResponse;
 import org.hpccsystems.ws.client.platform.DFUDataColumnInfo;
 import org.hpccsystems.ws.client.platform.DFURecordDefInfo;
