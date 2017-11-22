@@ -1,8 +1,8 @@
 package org.hpccsystems.ws.client.platform;
 
 import org.hpccsystems.ws.client.platform.DFUFilePartInfo;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUPart;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUFilePartsOnCluster;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUPart;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUFilePartsOnCluster;
 
 /**
  * @author John Holt
@@ -12,7 +12,7 @@ public class DFUFilePartsOnClusterInfo extends DFUFilePartsOnCluster
 {
     static final long serialVersionUID = 1;
 
-    public DFUFilePartsOnClusterInfo(org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUFilePartsOnCluster raw)
+    public DFUFilePartsOnClusterInfo(DFUFilePartsOnCluster raw)
     {
         super(raw.getCluster(), raw.getBaseDir(), raw.getReplicateDir(), raw.getReplicate(), raw.getCanReplicate(), raw
                 .getDFUFileParts());

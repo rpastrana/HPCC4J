@@ -1,6 +1,6 @@
 package org.hpccsystems.ws.client.platform;
 
-import org.hpccsystems.ws.client.gen.wsdfu.v1_36.DFUPart;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_37.DFUPart;
 
 /**
  * @author John Holt
@@ -15,7 +15,7 @@ public class DFUFilePartInfo extends DFUPart
      */
     public DFUFilePartInfo(DFUPart raw)
     {
-        super(raw.getId(), raw.getCopy(), raw.getActualSize(), raw.getIp(), raw.getPartsize());
+        super(raw.getId(), raw.getCopy(), raw.getIp(), raw.getPartsize());
     }
 
     /**
@@ -31,7 +31,7 @@ public class DFUFilePartInfo extends DFUPart
      */
     public DFUFilePartInfo(Integer id, Integer copy, String actualSize, String ip, String partsize)
     {
-        super(id, copy, actualSize, ip, partsize);
+        super(id, copy, ip, partsize);
     }
 
 }
