@@ -121,9 +121,24 @@ public class HPCCWsDFUClient extends DataSingleton
      */
     public DFUInfoResponse getFileInfo(String logicalname, String clustername) throws Exception
     {
+      return this.getFileInfo(logicalname,  clustername, false);
+    }
+    /**
+     *
+     * @param logicalname logical file name, can start with ~
+     * @param clustername optional, if specified the cluster name used in the search
+     * @param wantRecordInfo want record structure information returned
+     * @return
+     * @throws Exception
+     */
+    public DFUInfoResponse getFileInfo(String logicalname, String clustername,
+                                       boolean wantRecordInfo) throws Exception
+    {
         WsDfuServiceSoapProxy proxy = getSoapProxy();
         DFUInfoRequest req = new DFUInfoRequest();
         req.setName(logicalname);
+        req.setIncludeBinTypeInfo(wantRecordInfo);
+        req.setIncludeJsonTypeInfo(wantRecordInfo);
         if (clustername != null)
         {
             req.setCluster(clustername);
@@ -688,9 +703,14 @@ public class HPCCWsDFUClient extends DataSingleton
      */
     public DFUFileDetailInfo getFileDetails(String logicalname, String clustername) throws Exception
     {
+      return this.getFileDetails(logicalname,  clustername, false);
+    }
+    public DFUFileDetailInfo getFileDetails(String logicalname,
+        String clustername, boolean wantRecordInfo) throws Exception
+    {
         try
         {
-            DFUInfoResponse resp = this.getFileInfo(logicalname, clustername);
+            DFUInfoResponse resp = this.getFileInfo(logicalname, clustername, wantRecordInfo);
             if (resp == null)
             {
                 throw new FileNotFoundException(logicalname + " does not exist");
