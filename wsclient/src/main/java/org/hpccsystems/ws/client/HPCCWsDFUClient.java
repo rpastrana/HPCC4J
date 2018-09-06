@@ -15,8 +15,6 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.axis.client.Stub;
 import org.apache.commons.lang3.StringUtils;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_39.SuperfileListRequest;
-import org.hpccsystems.ws.client.gen.wsdfu.v1_39.SuperfileListResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.ArrayOfEspException;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUActionInfo;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUArrayActionRequest;
@@ -24,7 +22,13 @@ import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUArrayActionResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUArrayActions;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUBrowseDataRequest;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUBrowseDataResponse;
+//import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUCreateAndPublishRequest;
+//import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUCreateAndPublishResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUDataColumn;
+//import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileAccessInfo;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileAccessRequest;
+//import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileAccessRequestBase;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileAccessResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileViewRequest;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileViewResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUGetDataColumnsRequest;
@@ -39,6 +43,10 @@ import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUQueryResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUSearchDataRequest;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUSearchDataResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.EspException;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.FileAccessRole;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.SecAccessType;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.SuperfileListRequest;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_39.SuperfileListResponse;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.WsDfuLocator;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.WsDfuServiceSoap;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.WsDfuServiceSoapProxy;
@@ -554,8 +562,7 @@ public class HPCCWsDFUClient extends DataSingleton
             {
                 for (EspException espexception : e.getException())
                 {
-                    Utils.println(System.out, "Error retrieving field names for file: " + espexception.getSource()
-                            + espexception.getMessage(), false, true);
+                    Utils.println(System.out, "Error retrieving field names for file: " + espexception.getSource() + espexception.getMessage(), false, true);
                 }
             }
             throw e;
@@ -586,8 +593,7 @@ public class HPCCWsDFUClient extends DataSingleton
      */
     protected HPCCWsDFUClient(Connection baseConnection)
     {
-        this(baseConnection.getProtocol(), baseConnection.getHost(), baseConnection.getPort(),
-                baseConnection.getUserName(), baseConnection.getPassword());
+        this(baseConnection.getProtocol(), baseConnection.getHost(), baseConnection.getPort(),baseConnection.getUserName(), baseConnection.getPassword());
     }
 
     /**
@@ -650,8 +656,7 @@ public class HPCCWsDFUClient extends DataSingleton
      * @return an ArrayList of DFUDataColumns containing the name and field type.
      * @throws Exception
      */
-    public EclRecordInfo getDatasetFields(String datasetname, String clusterName, String fieldSeparator)
-            throws Exception
+    public EclRecordInfo getDatasetFields(String datasetname, String clusterName, String fieldSeparator) throws Exception
     {
         DFUFileDetailInfo info = getFileDetails(datasetname, clusterName);
         if (fieldSeparator != null)
@@ -883,6 +888,130 @@ public class HPCCWsDFUClient extends DataSingleton
         return result;
     }
 
+    /*public String getNewFileAccessBlob(SecAccessType accesstype, String filename, String clustername, int expiryseconds, String jobid) throws Exception
+    {
+    	
+    	DFUFileAccessInfo accessinfo = getNewFileAccessInfo(accesstype, filename, clustername, expiryseconds, jobid);
+    	if (accessinfo != null)
+    		return accessinfo.getMetaInfoBlob();
+    	return null;
+    }
+
+    public DFUFileAccessInfo getNewFileAccessInfo(SecAccessType accesstype, String filename, String clustername, int expiryseconds, String jobid) throws Exception
+    {
+    	return getFileAccess(accesstype, filename, clustername, expiryseconds, jobid, true, false, false, false);
+    }*/
+
+    public DFUFileAccessResponse getFileAccess(SecAccessType accesstype, String filename, String clustername, int expiryseconds, String jobid, /*boolean refresh,*/  boolean includejsonTypeInfo, boolean includebinTypeInfo, boolean requestfileinfo) throws Exception
+    {
+        WsDfuServiceSoapProxy proxy = getSoapProxy();
+        DFUFileAccessRequest req = new DFUFileAccessRequest();
+
+        req.setAccessRole(FileAccessRole.External);
+        req.setAccessType(accesstype);
+        req.setCluster(clustername);
+        req.setExpirySeconds(expiryseconds);
+        req.setJobId(jobid);
+        req.setName(filename);
+        req.setReturnBinTypeInfo(includebinTypeInfo);
+        req.setReturnJsonTypeInfo(includejsonTypeInfo);
+
+        //DFUFileAccessRequestBase reqbase = new DFUFileAccessRequestBase();
+        //reqbase.setName(filename);
+       // reqbase.setCluster(clustername);
+       // reqbase.setExpirySeconds(expiryseconds);
+       // reqbase.setAccessType(accesstype);
+       // req.setReturnFileInfo(requestfileinfo);
+       // reqbase.setReturnBinTypeInfo(includebinTypeInfo);
+       // reqbase.setReturnJsonTypeInfo(includejsonTypeInfo);
+
+        //req.setRequests(reqbase);
+
+        try
+        {
+        	DFUFileAccessResponse resp = proxy.DFUFileAccess(req);
+            if (resp == null)
+            {
+                throw new Exception("Did not receive DFUFileAccess response");
+            }
+
+            this.handleException(resp.getExceptions());
+
+            return resp;
+        }
+        catch (ArrayOfEspException e)
+        {
+            if (e != null)
+            {
+                for (EspException espexception : e.getException())
+                {
+                    Utils.println(System.out, "Error adquiring read access for: '" + clustername + "::" + filename + "' \n" + espexception.getSource() + espexception.getMessage(), false, true);
+                }
+            }
+            throw e;
+        }
+    }
+/*
+    public String getCreateAndPublishAccessBlob(String filename, String clustername, String eclrecdef, int expirysecs, String jobid, boolean refresh,  boolean includejsonTypeInfo, boolean includebinTypeInfo) throws Exception
+    {
+    	DFUFileAccessInfo resp = getCreateAndPublishAccessInfo(filename, clustername, eclrecdef, expirysecs );
+    	if (resp != null)
+    		return resp.getMetaInfoBlob();
+    	
+    	return null;
+    }
+
+    public DFUFileAccessInfo getCreateAndPublishAccessInfo(String filename, String clustername, String eclrecdef, int expirysecs) throws Exception
+    {
+    	DFUCreateAndPublishResponse resp = createAndPublish(filename, clustername, eclrecdef, expirysecs,  false, false);
+    	if (resp != null)
+    		return resp.getAccessInfo();
+    	
+    	return null;
+    }
+    
+    public DFUCreateAndPublishResponse createAndPublish(String filename, String clustername, String eclrecdef, int expirysecs, boolean includejsonTypeInfo, boolean includebinTypeInfo) throws Exception
+    {
+        WsDfuServiceSoapProxy proxy = getSoapProxy();
+        DFUCreateAndPublishRequest req = new DFUCreateAndPublishRequest();
+        DFUFileAccessRequestBase basereq = new DFUFileAccessRequestBase(); 
+
+        basereq.setName(filename);
+        basereq.setCluster(clustername);
+        basereq.setExpirySeconds(expirysecs);
+        //req.set setJobDescription("JAPI.WsClient CreateAndPublish " + clustername + "::" + filename);
+        basereq.setReturnBinTypeInfo(includebinTypeInfo);
+        basereq.setReturnJsonTypeInfo(includejsonTypeInfo);
+
+        req.setECLRecordDefinition(eclrecdef);
+        req.setRequests(basereq);
+
+        try
+        {
+            DFUCreateAndPublishResponse resp = proxy.DFUCreateAndPublish(req);
+
+            if (resp == null)
+            {
+                throw new Exception("Did not receive DFUCreateAndPublish Response");
+            }
+
+            this.handleException(resp.getExceptions());
+
+            return resp;
+        }
+        catch (ArrayOfEspException e)
+        {
+            if (e != null)
+            {
+                for (EspException espexception : e.getException())
+                {
+                    Utils.println(System.out, "Error during CreateAndPublish '" + clustername + "::" + filename + "' request. \n" + espexception.getSource() + espexception.getMessage(), false, true);
+                }
+            }
+            throw e;
+        }
+    }
+*/
     /**
      * @param logicalname
      *            - logical file to get file info for, can start with '~' or not

@@ -12,10 +12,10 @@ import org.hpccsystems.ws.client.antlr.CaseControlStringStream;
 import org.hpccsystems.ws.client.antlr.EclRecordLexer;
 import org.hpccsystems.ws.client.antlr.EclRecordParser;
 import org.hpccsystems.ws.client.antlr.EclRecordParser.ProgramContext;
-import org.hpccsystems.ws.client.antlr.EclRecordReader;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUDataColumn;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileDetail;
 import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFilePartsOnCluster;
+import org.hpccsystems.ws.client.antlr.EclRecordReader;
 import org.hpccsystems.ws.client.utils.FileFormat;
 import org.hpccsystems.ws.client.platform.DFUFilePartsOnClusterInfo;
 
