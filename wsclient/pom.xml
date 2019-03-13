@@ -69,6 +69,7 @@
                         <exclude>org/hpccsystems/ws/client/gen/wstopology/v1_23/**/*</exclude>
                         <exclude>org/hpccsystems/ws/client/gen/wstopology/v1_25/**/*</exclude>
                         <exclude>org/hpccsystems/ws/client/gen/wstopology/v1_26/**/*</exclude>
+                        <exclude>org/hpccsystems/ws/client/gen/wstopology/v1_27/**/*</exclude>
                         <exclude>org/hpccsystems/ws/client/gen/wsworkunits/v1_46/**/*</exclude>
                         <exclude>org/hpccsystems/ws/client/gen/wsworkunits/v1_56/**/*</exclude>
                         <exclude>org/hpccsystems/ws/client/gen/wsworkunits/v1_58/**/*</exclude>

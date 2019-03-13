@@ -17,17 +17,29 @@
 
 package org.hpccsystems.ws.client.wrappers.wsdfu;
 
-import org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileCreateResponse;
+import org.hpccsystems.ws.client.gen.wsdfu.v1_50.DFUFileCreateResponse;
 
 public class DFUCreateFileWrapper
 {
-    private DFUFileCreateResponse origresp;
+    private String fileId;
     private DFUFileAccessInfoWrapper wrappedDFUFileAccessInfo;
-    
+
     public DFUCreateFileWrapper (DFUFileCreateResponse resp) throws Exception
     {
-        origresp = resp;
-        
+        fileId = resp.getFileId();
+
+        if (resp != null && resp.getAccessInfo() != null)
+        {
+            wrappedDFUFileAccessInfo = new DFUFileAccessInfoWrapper(resp.getAccessInfo());
+        }
+        else
+            throw new Exception("Could not construct DFUCreateFileWrapper: response or response.getAccessInfo is null");
+    }
+
+    public DFUCreateFileWrapper (org.hpccsystems.ws.client.gen.wsdfu.v1_39.DFUFileCreateResponse resp) throws Exception
+    {
+        fileId = resp.getFileId();
+
         if (resp != null && resp.getAccessInfo() != null)
         {
             wrappedDFUFileAccessInfo = new DFUFileAccessInfoWrapper(resp.getAccessInfo());
@@ -44,7 +56,7 @@ public class DFUCreateFileWrapper
 
     public String getFileID()
     {
-        return origresp.getFileId();
+        return fileId;
     }
 
     /**
@@ -105,5 +117,13 @@ public class DFUCreateFileWrapper
     {
         return wrappedDFUFileAccessInfo.getRecordTypeInfoJson();
     }
-    
+
+    /**
+     * Gets the created file Access Information
+     * @return
+     */
+    public DFUFileAccessInfoWrapper getFileAccessInfo()
+    {
+        return wrappedDFUFileAccessInfo;
+    }
 }
