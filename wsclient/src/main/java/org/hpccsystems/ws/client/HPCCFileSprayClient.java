@@ -1237,11 +1237,6 @@ public class HPCCFileSprayClient extends BaseHPCCWsClient
             log.error("File download failed. Drop zone file enumeration failed with error: " + e.getMessage());
             return -1;
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            log.error("File download failed. Drop zone file enumeration failed with error: " + e.getMessage());
-            return -1;
-        }
 
         URL downloadURL = null;
         try

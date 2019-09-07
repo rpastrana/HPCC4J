@@ -151,7 +151,7 @@ public class PhysicalMachine extends DataSingleton
             PhysicalFileStructWrapper[] dzfiles = wsfsclient.listFiles(physicalmachinestruct.getNetaddress(), physicalmachinestruct.getDirectory(), null);
             update(dzfiles);
         }
-        catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             log.error("Could not refresh files list for PhysicalMachine: '" + physicalmachinestruct.getName() + "'");
             e.printStackTrace();

@@ -118,10 +118,6 @@ public class WSSQLClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -149,10 +145,6 @@ public class WSSQLClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -172,10 +164,6 @@ public class WSSQLClientTest extends BaseRemoteTest
         {
             e.printStackTrace();
             Assert.fail();
-        }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
         }
     }
 
@@ -242,10 +230,6 @@ public class WSSQLClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -277,10 +261,6 @@ public class WSSQLClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfECLExceptionWrapper | ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -309,11 +289,6 @@ public class WSSQLClientTest extends BaseRemoteTest
             catch (Exception e)
             {
                 System.out.println("Exception while executing SQL: " + e.getLocalizedMessage());
-            }
-            catch (ArrayOfEspExceptionWrapper e)
-            {
-                e.toString();
-                Assert.fail();
             }
 
             Assert.assertNotNull(wuid);
@@ -371,11 +346,6 @@ public class WSSQLClientTest extends BaseRemoteTest
                 {
                     System.out.println("Exception while fetching results related to WUID: " + wuid + ": " + e.getLocalizedMessage());
                 }
-                catch (ArrayOfEspExceptionWrapper e)
-                {
-                    e.toString();
-                    Assert.fail();
-                }
 
                 Assert.assertNotNull(filtercolumnname);
                 String filter1 = sql + " where mytable." + filtercolumnname + " != ?";// filtercolumntype == 1 ? "";
@@ -399,10 +369,6 @@ public class WSSQLClientTest extends BaseRemoteTest
         {
             e.printStackTrace();
             Assert.fail();
-        }
-        catch (ArrayOfECLExceptionWrapper | ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
         }
     }
 }

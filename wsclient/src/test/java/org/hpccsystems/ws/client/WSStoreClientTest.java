@@ -124,10 +124,6 @@ public class WSStoreClientTest extends BaseRemoteTest
         {
             Assert.fail(e.getLocalizedMessage());
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -143,10 +139,6 @@ public class WSStoreClientTest extends BaseRemoteTest
         catch (Exception e)
         {
             Assert.fail(e.getLocalizedMessage());
-        }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
         }
     }
 

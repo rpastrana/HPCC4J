@@ -26,7 +26,7 @@ import java.util.List;
  * TimeStamp: 2019-08-03T01:15:45.768Z
  */
 
-public class ArrayOfEspExceptionWrapper extends Throwable
+public class ArrayOfEspExceptionWrapper extends Exception
 {
     private static final long serialVersionUID = 1L;
 
@@ -319,5 +319,10 @@ public class ArrayOfEspExceptionWrapper extends Throwable
 	public List<EspExceptionWrapper> getExceptions( )
 	{
 		return this.exceptions;
+	}
+	
+	@Override
+	public String getLocalizedMessage() {
+	    return this.toString();
 	}
 }

@@ -75,7 +75,7 @@ public class Cluster extends DataSingleton
                 TpClusterInfoResponse respsone = wsTopologyClient.getClusterInfo(info.getName());
                 Update(respsone);
         }
-        catch (Exception | ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
         }
