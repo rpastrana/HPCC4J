@@ -119,7 +119,7 @@ public class FileSprayClientTest extends BaseRemoteTest
                 Assert.assertEquals(thisdz.getPath(), localdzs[i].getPath());
             }
         }
-        catch (Exception | ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
             Assert.fail();
@@ -134,7 +134,7 @@ public class FileSprayClientTest extends BaseRemoteTest
             DropZoneWrapper[] dzs = filesprayclient.fetchDropZones("invalidserver:8010");
             Assert.assertNull(dzs);
         }
-        catch (Exception | ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             System.out.println("Test fetch DropZones Bad URL failed as expected: " + e.getLocalizedMessage());
         }

@@ -386,16 +386,11 @@ public class PlatformTester
             }
             catch (Exception e)
             {
+                e.printStackTrace();
                 System.out.println("Encountered issue while testing WsSQL on port: " + wssqlport + "\n>>" + e.getLocalizedMessage());
             }
-            catch (ArrayOfECLExceptionWrapper e)
-            {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-
         }
-        catch (Exception | ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             System.out.println( e.getLocalizedMessage());
         }

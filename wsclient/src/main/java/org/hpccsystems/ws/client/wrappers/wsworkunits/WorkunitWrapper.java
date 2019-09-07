@@ -2516,4 +2516,9 @@ public class WorkunitWrapper implements Comparable<org.hpccsystems.ws.client.wra
 
         return result;
     }
+
+    public void setExceptions(List<WUExceptionWrapper> errs)
+    {
+        this.exceptions=errs;
+    }
 }

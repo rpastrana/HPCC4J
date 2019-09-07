@@ -471,11 +471,7 @@ public class HPCCWsClient extends DataSingleton
         }
         catch (Exception e)
         {
-            e.printStackTrace();
-        }
-        catch (org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
-        {
-            log.error(e.toString());
+            log.error(e.toString(),e);
         }
 
         return null;
@@ -539,7 +535,7 @@ public class HPCCWsClient extends DataSingleton
         {
             log.error("Error: Could not spray file" + e.getLocalizedMessage());
         }
-        catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
         }
@@ -630,7 +626,7 @@ public class HPCCWsClient extends DataSingleton
         {
             log.error("Error: Could not spray file" + e.getLocalizedMessage());
         }
-        catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
         }
@@ -721,7 +717,7 @@ public class HPCCWsClient extends DataSingleton
             else
                 throw new Exception("Could not initialize HPCC File Spray Client");
         }
-        catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
             return false;
@@ -746,7 +742,7 @@ public class HPCCWsClient extends DataSingleton
             else
                 throw new Exception("Could not initialize HPCC File Spray Client");
         }
-        catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
             return false;
@@ -776,10 +772,6 @@ public class HPCCWsClient extends DataSingleton
         {
             log.error("Error submitting ECL: " + e.getLocalizedMessage());
             throw e;
-        }
-        catch (ArrayOfECLExceptionWrapper | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
-        {
-            log.error("Error submitting ECL: " + e.toString());
         }
 
         return results;
@@ -820,10 +812,6 @@ public class HPCCWsClient extends DataSingleton
         catch (Exception e)
         {
             log.error("Error submitting ECL: " + e.getLocalizedMessage());
-        }
-        catch (ArrayOfECLExceptionWrapper | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
-        {
-            log.error("Error submitting ECL: " + e.toString());
         }
 
         return WUID;

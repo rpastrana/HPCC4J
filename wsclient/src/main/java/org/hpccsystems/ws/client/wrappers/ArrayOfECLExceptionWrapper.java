@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.hpccsystems.ws.client.gen.axis2.wsworkunits.v1_75.ECLException;
 
-public class ArrayOfECLExceptionWrapper extends Throwable
+public class ArrayOfECLExceptionWrapper extends Exception
 {
     private static final long serialVersionUID = 1L;
     protected List<ECLExceptionWrapper> eclExceptions = new ArrayList<ECLExceptionWrapper>();
@@ -95,4 +95,9 @@ public class ArrayOfECLExceptionWrapper extends Throwable
     {
         return this.eclExceptions;
     }
+    @Override
+    public String getLocalizedMessage() {
+        return this.toString();
+    }
+
 }

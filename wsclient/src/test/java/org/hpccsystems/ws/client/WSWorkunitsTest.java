@@ -85,10 +85,6 @@ public class WSWorkunitsTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
-        }
     }
 
     @Test
@@ -111,10 +107,6 @@ public class WSWorkunitsTest extends BaseRemoteTest
         catch (Exception e)
         {
             e.printStackTrace();
-            Assert.fail();
-        }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
             Assert.fail(e.toString());
         }
     }
@@ -141,10 +133,6 @@ public class WSWorkunitsTest extends BaseRemoteTest
         {
             e.printStackTrace();
             Assert.fail(e.getLocalizedMessage());
-        }
-        catch (ArrayOfECLExceptionWrapper | ArrayOfEspExceptionWrapper e)
-        {
-            Assert.fail(e.toString());
         }
     }
 }

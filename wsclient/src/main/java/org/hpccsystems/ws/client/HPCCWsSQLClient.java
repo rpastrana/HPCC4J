@@ -297,7 +297,7 @@ public class HPCCWsSQLClient  extends BaseHPCCWsClient
                         success = true;
                 }
             }
-            catch (Exception | ArrayOfEspExceptionWrapper e) { log.error(e.getLocalizedMessage());}
+            catch (Exception e) { log.error(e.getLocalizedMessage());}
         }
         return success;
     }

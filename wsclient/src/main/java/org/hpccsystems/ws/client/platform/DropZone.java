@@ -188,7 +188,7 @@ public class DropZone extends DataSingleton
         {
             update(platform.getWsClient().getWsTopologyClient().queryDropzoneMachines(dzInfo.getName()));
         }
-        catch (Exception | ArrayOfEspExceptionWrapper e)
+        catch (Exception e)
         {
             e.printStackTrace();
         }

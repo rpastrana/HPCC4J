@@ -346,10 +346,6 @@ public class Platform extends DataSingleton
             {
                 e.printStackTrace();
             }
-            catch (ArrayOfEspExceptionWrapper e)
-            {
-                e.printStackTrace();
-            }
         }
         finally
         {
@@ -546,7 +542,7 @@ public class Platform extends DataSingleton
             {
                 confirmDisable();//rodrigo: we might need to confirmdisable for exception, or tighten up exceptions thrown
             }
-            catch (Exception | org.hpccsystems.ws.client.wrappers.ArrayOfEspExceptionWrapper e)
+            catch (Exception e)
             {
                 e.printStackTrace();
             }
@@ -768,7 +764,7 @@ public class Platform extends DataSingleton
                 if (services != null)
                     updateServices(services);
             }
-            catch (Exception | ArrayOfEspExceptionWrapper e)
+            catch (Exception e)
             {
                 e.printStackTrace();
                 confirmDisable();

@@ -134,11 +134,6 @@ public class WsDFUClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            e.toString();
-            Assert.fail();
-        }
     }
 
     public void getFirstFileAvailable(String directory)
@@ -168,11 +163,6 @@ public class WsDFUClientTest extends BaseRemoteTest
         catch (Exception e)
         {
             e.printStackTrace();
-            Assert.fail();
-        }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            e.toString();
             Assert.fail();
         }
     }
@@ -209,11 +199,6 @@ public class WsDFUClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            e.toString();
-            Assert.fail();
-        }
     }
 
     @Test
@@ -233,10 +218,6 @@ public class WsDFUClientTest extends BaseRemoteTest
             e.printStackTrace();
             Assert.fail();
         }
-        catch (ArrayOfEspExceptionWrapper e)
-        {
-            e.toString();
-            Assert.fail();
-        }
+
     }
 }
