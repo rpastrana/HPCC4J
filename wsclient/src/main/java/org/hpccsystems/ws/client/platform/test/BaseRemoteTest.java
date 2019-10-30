@@ -17,6 +17,9 @@
 
 package org.hpccsystems.ws.client.platform.test;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import org.hpccsystems.ws.client.HPCCWsClient;
 import org.hpccsystems.ws.client.platform.Platform;
 import org.hpccsystems.ws.client.utils.Connection;
@@ -40,6 +43,22 @@ public abstract class BaseRemoteTest
     protected String connTO = System.getProperty("connecttimeoutmillis");
     protected String sockTO = System.getProperty("sockettimeoutmillis");
 
+    static
+    {
+        InetAddress ip;
+        String hostname;
+        try 
+        {
+            ip = InetAddress.getLocalHost();
+            hostname = ip.getHostName();
+            System.out.println("Remote test executing on: " + hostname + "(" + ip + ")");
+        }
+        catch (UnknownHostException e)
+        {
+            e.printStackTrace();
+        } 
+    }
+    
     @Before
     public void setup() throws Exception
     {
