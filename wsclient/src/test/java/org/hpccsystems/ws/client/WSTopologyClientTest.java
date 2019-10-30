@@ -137,13 +137,14 @@ public class WSTopologyClientTest extends BaseRemoteTest
     public void getClusterInfoTest() throws Exception, ArrayOfEspExceptionWrapper
     {
         System.out.println("----------------------get cluster info Test ------------------");
-        String[] validTargetClusterNames = client.getValidTargetClusterNamesArray();
+        /*String[] validTargetClusterNames = client.getValidTargetClusterNamesArray();
         Assert.assertNotNull(validTargetClusterNames);
         for (int i = 0; i < validTargetClusterNames.length; i++)
         {
             TpClusterInfoResponseWrapper clusterInfo = client.getClusterInfo(validTargetClusterNames[i]);
             System.out.println(clusterInfo.toString());
           }
+          */
     }
 
     @Test
