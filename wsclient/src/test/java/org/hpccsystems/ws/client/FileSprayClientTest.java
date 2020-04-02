@@ -16,8 +16,6 @@ import org.hpccsystems.ws.client.wrappers.gen.filespray.DFUWorkunitsActionRespon
 import org.hpccsystems.ws.client.wrappers.gen.filespray.DropZoneFilesResponseWrapper;
 import org.hpccsystems.ws.client.wrappers.gen.filespray.DropZoneWrapper;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -26,9 +24,9 @@ import static org.junit.Assert.assertTrue;
 
 public class FileSprayClientTest extends BaseRemoteTest
 {
-    private HPCCFileSprayClient filesprayclient = wsclient.getFileSprayClient();;
+    private static HPCCFileSprayClient filesprayclient = wsclient.getFileSprayClient();;
     private String              dropzoneName    = System.getProperty("dropzoneName");
-    private List<String>        fileNames       = new ArrayList<>();
+    private static List<String>        fileNames       = new ArrayList<>();
     private final static String              testFile1       = System.getProperty("dropzoneTestFile1", "myfilename.txt");
     private final static String              path            = System.getProperty("dropzonePath", "/path/to/dropzone");
     private final static String              os              = System.getProperty("dropzoneOs", "");
@@ -50,11 +48,6 @@ public class FileSprayClientTest extends BaseRemoteTest
 
         if (System.getProperty("dropzoneOs") == null)
             System.out.println("dropzoneOs not provided - defaulting to ''");
-    }
-
-    @BeforeClass
-    public void setUp() throws Exception
-    {
         fileNames.add(testFile1);
     }
 
@@ -105,8 +98,8 @@ public class FileSprayClientTest extends BaseRemoteTest
         Connection otherconnection = null;
         try
         {
-            otherconnection = new Connection(this.connection.getUrl());
-            if (this.hpccUser == null && this.hpccUser.isEmpty())
+            otherconnection = new Connection(connection.getUrl());
+            if (hpccUser == null && hpccUser.isEmpty())
             {
                 otherconnection.setUserName("something"); //ensuring this connection is different
             }
@@ -247,12 +240,12 @@ public class FileSprayClientTest extends BaseRemoteTest
     @Test
     public void testDeleteDropZoneFileInvalidFile()
     {
-        fileNames = new ArrayList<>();
-        fileNames.add("SomeNoneExistantFile.txt");
+    	List<String> badFileName = new ArrayList<>();
+    	badFileName.add("SomeNoneExistantFile.txt");
         try
         {
             HPCCWsClient wsClient = platform.checkOutHPCCWsClient();
-            DFUWorkunitsActionResponseWrapper result = filesprayclient.deleteDropZoneFiles(dropzoneName, fileNames, wsClient.getHost(), path, null);
+            DFUWorkunitsActionResponseWrapper result = filesprayclient.deleteDropZoneFiles(dropzoneName, badFileName, wsClient.getHost(), path, null);
 
             if (!result.getExceptions().getException().isEmpty())
             {
@@ -260,7 +253,7 @@ public class FileSprayClientTest extends BaseRemoteTest
             }
             else
             {
-                assertEquals(fileNames.get(0), result.getDFUActionResults().getDFUActionResult().get(0).getID());
+                assertEquals(badFileName.get(0), result.getDFUActionResults().getDFUActionResult().get(0).getID());
                 assertEquals(DELETE_ACTION, result.getDFUActionResults().getDFUActionResult().get(0).getAction());
                 assertEquals(FILE_DOES_NOT_EXIST_RESULT, result.getDFUActionResults().getDFUActionResult().get(0).getResult());
                 System.out.println("File not found as expected");

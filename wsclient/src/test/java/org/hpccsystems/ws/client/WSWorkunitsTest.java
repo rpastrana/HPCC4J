@@ -38,7 +38,7 @@ public class WSWorkunitsTest extends BaseRemoteTest
 
 
     @BeforeClass
-    public void setup() throws Exception
+    public static void setup() throws Exception
     {
         client = wsclient.getWsWorkunitsClient();
         Assert.assertNotNull(client);
