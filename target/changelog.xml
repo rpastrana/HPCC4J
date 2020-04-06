@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<changelog>
+  
+<changeset datePattern="yyyyMMdd HH:mm:ss z" start="20200307 09:37:24 EST" end="20200407 10:37:24 EDT">
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-04-02</date>
+		<time pattern="HH:mm:ss">00:18:23</time>
+		<author><![CDATA[Rodrigo Pastrana <rodrigo.pastrana@lexisnexisrisk.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/main/java/org/hpccsystems/ws/client/HPCCWsStoreClient.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/main/java/org/hpccsystems/ws/client/platform/test/BaseRemoteTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/FileSprayClientTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSSQLClientTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSStoreClientTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSWorkunitsTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WUQueryTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsAttributesClientTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsDFUClientTest.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsWorkunitsClientIntegrationTest_54.java</name>
+			<revision>b859b45c3981028fa252ca8049eb483748a526c8</revision>
+		</file>
+		<msg><![CDATA[JAPI-288 Address several JUNIT issues
+
+- Provides hpcc user name default
+- Ensures beforeclass methods are static
+- Adds Assume conditions in order to skip invalid tests
+- Ensures order is enforced in order specific tests
+
+Signed-off-by: Rodrigo Pastrana <rodrigo.pastrana@lexisnexisrisk.com>]]></msg>
+	</changelog-entry>
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-04-02</date>
+		<time pattern="HH:mm:ss">13:35:29</time>
+		<author><![CDATA[James McMullan <jpmcmu@gmail.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/test/java/org/hpccsystems/dfs/client/DFSReadWriteTest.java</name>
+			<revision>f1ba9e77a8538bb04f8fa7bce7d575e391c9b46d</revision>
+		</file>
+		<msg><![CDATA[JAPI-290 DFSClient: Correct JUnit test dataset names (#373)
+
+- Update JUnit tests to use the correct datasets
+
+Signed-off-by: James McMullan <James.McMullan@lexisnexis.com>]]></msg>
+	</changelog-entry>
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-03-30</date>
+		<time pattern="HH:mm:ss">16:47:04</time>
+		<author><![CDATA[Rodrigo <rodrigo.pastrana@lexisnexis.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>commons-hpcc/src/main/java/org/hpccsystems/commons/ecl/FileFilter.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/main/java/org/hpccsystems/dfs/client/HPCCFile.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/test/java/org/hpccsystems/dfs/client/DFSBenchmarkTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>added</action>
+			<name>dfsclient/src/test/java/org/hpccsystems/dfs/client/DFSHPCCFile.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/test/java/org/hpccsystems/dfs/client/DFSReadWriteTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/main/java/org/hpccsystems/ws/client/platform/test/BaseRemoteTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/BaseWsAttributesClientIntegrationTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/BaseWsWorkunitsClientIntegrationTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/FileSprayClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSFileIOClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSPackageProcessTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSSQLClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSStoreClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSTopologyClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WSWorkunitsTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WUQueryTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsAttributesClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsDFUClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsSMCClientTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/WsWorkunitsClientIntegrationTest_620.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/src/test/java/org/hpccsystems/ws/client/platform/EclParseRegressionTest.java</name>
+			<revision>05166761211e76d9c05e9554bf6941be629e28cf</revision>
+		</file>
+		<msg><![CDATA[JAPI-286 Improve RemoteUnitTest performance (#371)
+
+- Ensure baseremotetest fields initialized in static block
+- No longer re-initialize final static fields in setup method
+- FileFilter was swallowing exceptions
+- DFSClient's hpccfile was not setting targetfilecluster
+
+Signed-off-by: Rodrigo Pastrana <rodrigo.pastrana@lexisnexisrisk.com>]]></msg>
+	</changelog-entry>
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-03-23</date>
+		<time pattern="HH:mm:ss">12:37:41</time>
+		<author><![CDATA[Michael Gardner <michael.gardner@lexisnexisrisk.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>commons-hpcc/pom.xml</name>
+			<revision>6f174d716fed6f6a18a8824a306b0956300ec0f2</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/pom.xml</name>
+			<revision>6f174d716fed6f6a18a8824a306b0956300ec0f2</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>pom.xml</name>
+			<revision>6f174d716fed6f6a18a8824a306b0956300ec0f2</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/pom.xml</name>
+			<revision>6f174d716fed6f6a18a8824a306b0956300ec0f2</revision>
+		</file>
+		<msg><![CDATA[japi version update 7.8.x
+
+Signed-off-by: Michael Gardner <michael.gardner@lexisnexisrisk.com>]]></msg>
+	</changelog-entry>
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-03-23</date>
+		<time pattern="HH:mm:ss">11:14:33</time>
+		<author><![CDATA[Michael Gardner <michael.gardner@lexisnexisrisk.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>commons-hpcc/pom.xml</name>
+			<revision>a3000c6888e4abb16ef44338865ba2fb77cc6ae0</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/pom.xml</name>
+			<revision>a3000c6888e4abb16ef44338865ba2fb77cc6ae0</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>pom.xml</name>
+			<revision>a3000c6888e4abb16ef44338865ba2fb77cc6ae0</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>wsclient/pom.xml</name>
+			<revision>a3000c6888e4abb16ef44338865ba2fb77cc6ae0</revision>
+		</file>
+		<msg><![CDATA[Create 7.8.x from master
+
+Signed-off-by: Michael Gardner <michael.gardner@lexisnexisrisk.com>]]></msg>
+	</changelog-entry>
+	<changelog-entry>
+		<date pattern="yyyy-MM-dd">2020-03-20</date>
+		<time pattern="HH:mm:ss">17:04:27</time>
+		<author><![CDATA[James McMullan <jpmcmu@gmail.com>]]></author>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/main/java/org/hpccsystems/dfs/client/DataPartition.java</name>
+			<revision>1ae1095399e5699d890464e79c36a4dc65bdd926</revision>
+		</file>
+		<file>
+			<action>modified</action>
+			<name>dfsclient/src/main/java/org/hpccsystems/dfs/client/HPCCFile.java</name>
+			<revision>1ae1095399e5699d890464e79c36a4dc65bdd926</revision>
+		</file>
+		<msg><![CDATA[JAPI-285 DFSClient: HPCCFile setFilter does not work if partitions have already been created (#370)
+
+- Corrected setFilter to modify exisiting dataparts
+- Added setFilter method to DataPartition
+
+Signed-off-by: James McMullan <James.McMullan@lexisnexis.com>]]></msg>
+	</changelog-entry>
+</changeset>
+
+</changelog>
