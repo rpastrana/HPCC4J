@@ -30,10 +30,6 @@ import javax.net.ssl.SSLSocketFactory;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.LogManager;
 import org.hpccsystems.commons.ecl.RecordDefinitionTranslator;
-import org.hpccsystems.commons.benchmarking.IMetric;
-import org.hpccsystems.commons.benchmarking.IProfilable;
-import org.hpccsystems.commons.benchmarking.Units;
-import org.hpccsystems.commons.benchmarking.SimpleMetric;
 import org.hpccsystems.commons.ecl.FieldDef;
 import org.hpccsystems.commons.ecl.FileFilter;
 import org.hpccsystems.commons.errors.HpccFileException;
@@ -45,7 +41,7 @@ import org.hpccsystems.dfs.client.CompileTimeConstants;
  * The connection to a specific THOR node for a specific file part.
  *
  */
-public class RowServiceInputStream extends InputStream implements IProfilable
+public class RowServiceInputStream extends InputStream
 {
     private AtomicBoolean            active = new AtomicBoolean(false);
     private AtomicBoolean            closed = new AtomicBoolean(false);
@@ -112,23 +108,6 @@ public class RowServiceInputStream extends InputStream implements IProfilable
     // Buffer compact threshold should always be smaller than buffer prefetch threshold
     private int bufferPrefetchThresholdKB = DEFAULT_MAX_READ_SIZE_KB/2;
     private int bufferCompactThresholdKB = DEFAULT_MAX_READ_SIZE_KB/4;
-
-    public static final String BYTES_READ_METRIC = "bytesRead";
-    public static final String FIRST_BYTE_TIME_METRIC = "prefetchFirstByteTime";
-    public static final String WAIT_TIME_METRIC = "parseWaitTime";
-    public static final String MUTEX_WAIT_TIME_METRIC = "mutexWaitTime";
-    public static final String SLEEP_TIME_METRIC = "prefetchSleepTime";
-
-    public static final String FETCH_START_TIME_METRIC = "fetchRequestStartTime";
-    public static final String FETCH_TIME_METRIC = "fetchRequestReadTime";
-    public static final String FETCH_FINISH_TIME_METRIC = "fetchRequestFinishTime";
-    public static final String CLOSE_TIME_METRIC = "connectionCloseTime";
-
-    public static final String LONG_WAITS_METRIC = "numLongWaits";
-    public static final String FETCHES_METRIC = "numFetches";
-    public static final String PARTIAL_BLOCK_READS_METRIC = "numPartialBlockReads";
-    public static final String BLOCK_READS_METRIC = "numBlockReads";
-
 
     /**
      * Instantiates a new row service input stream.
@@ -1137,25 +1116,69 @@ public class RowServiceInputStream extends InputStream implements IProfilable
         return bytesSkipped;
     }
 
-    @Override
-    public List<IMetric> getMetrics()
+    public long getBytesRead()
     {
-        ArrayList<IMetric> metrics = new ArrayList<IMetric>();
-        metrics.add(new SimpleMetric((double) this.streamPos,BYTES_READ_METRIC,new Units(Units.Type.BYTES)));
-        metrics.add(new SimpleMetric((double) this.firstByteTimeNS,FIRST_BYTE_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.waitTimeNS,WAIT_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.sleepTimeNS,SLEEP_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.fetchStartTimeNS,FETCH_START_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.fetchTimeNS,FETCH_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.fetchFinishTimeNS,FETCH_FINISH_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.closeTimeNS,CLOSE_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.mutexWaitTimeNS,MUTEX_WAIT_TIME_METRIC,new Units(Units.Type.SECONDS,Units.Scale.NANO)));
-        metrics.add(new SimpleMetric((double) this.numLongWaits,LONG_WAITS_METRIC,new Units(Units.Type.COUNT)));
-        metrics.add(new SimpleMetric((double) this.numFetches,FETCHES_METRIC,new Units(Units.Type.COUNT)));
-        metrics.add(new SimpleMetric((double) this.numPartialBlockReads,PARTIAL_BLOCK_READS_METRIC,new Units(Units.Type.COUNT)));
-        metrics.add(new SimpleMetric((double) this.numBlockReads,BLOCK_READS_METRIC,new Units(Units.Type.COUNT)));
+        return this.streamPos;
+    }
 
-        return metrics;
+    public long getFirstByteTimeNS()
+    {
+        return firstByteTimeNS;
+    }
+
+    public long getWaitTimeNS()
+    {
+        return waitTimeNS;
+    }
+
+    public long getSleepTimeNS()
+    {
+        return sleepTimeNS;
+    }
+
+    public long getFetchStartTimeNS()
+    {
+        return fetchStartTimeNS;
+    }
+
+    public long getFetchTimeNS()
+    {
+        return fetchTimeNS;
+    }
+
+    public long getFetchFinishTimeNS()
+    {
+        return fetchFinishTimeNS;
+    }
+
+    public long getCloseTimeNS()
+    {
+        return closeTimeNS;
+    }
+
+    public long getMutexWaitTimeNS()
+    {
+        return mutexWaitTimeNS;
+    }
+
+    public int getNumLongWaits()
+    {
+        return numLongWaits;
+    }
+
+    public int getNumFetches()
+    {
+        return numFetches;
+    }
+
+    public long getNumPartialBlockReads()
+    {
+        return numPartialBlockReads;
+    }
+
+    public long getNumBlockReads()
+    {
+        return numBlockReads;
     }
 
     /**

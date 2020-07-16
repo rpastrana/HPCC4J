@@ -1,19 +1,3 @@
-/*******************************************************************************
- * HPCC SYSTEMS software Copyright (C) 2020 HPCC Systems®.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *******************************************************************************/
-
 package org.hpccsystems.commons.benchmarking;
 
 import java.util.ArrayList;
@@ -23,59 +7,45 @@ import java.lang.Math;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
-/**
- * A helper class that collects data points for a given metric and provides basic statistical functions. 
- */
-public class AveragedMetric implements IMetric
+public class AveragedMetric
 {
     // First 20 Thompson Tau values. Used to determine if a datapoint is an outlier
     // Each datapoint corresponds to a threshold based on the number of samples.
     // This table contains only the first 20 values so can only be used for up to 20 samples.
-    private static final double[] THOMPSON_TAU_TABLE20 = {
-        0,      0,      1.1511, 1.4250, 1.5712,
-        1.6563, 1.7110, 1.7491, 1.7770, 1.7984,
-        1.8153, 1.8290, 1.8403, 1.8498, 1.8579,
-        1.8649, 1.8710, 1.8764, 1.8811, 1.8853
+    private static final float[] THOMPSON_TAU_TABLE20 = {
+        0f,      0f,      1.1511f, 1.4250f, 1.5712f,
+        1.6563f, 1.7110f, 1.7491f, 1.7770f, 1.7984f,
+        1.8153f, 1.8290f, 1.8403f, 1.8498f, 1.8579f,
+        1.8649f, 1.8710f, 1.8764f, 1.8811f, 1.8853f
     };
 
-    private static final int MAX_DATA_POINTS = 20;
-    private static final int MIN_DATA_POINTS_FOR_OUTLIERS = 3;
+    private ArrayList<Float> dataPoints = new ArrayList<Float>();
 
-    private ArrayList<Double> dataPoints = new ArrayList<Double>();
-
-    private String name = "";
-    private Units units = null;
-    private String description = null;
+    public String name = "";
+    public String units = null;
+    public String description = null;
 
     public AveragedMetric(String name)
     {
         this.name = name;
     }
 
-    public AveragedMetric(String name, Units units)
+    public AveragedMetric(String name, String units)
     {
         this.name = name;
         this.units = units;
     }
 
-    public AveragedMetric(String name, Units units, String desc)
+    public AveragedMetric(String name, String units, String desc)
     {
         this.name = name;
         this.units = units;
         this.description = desc;
     }
-    
-    public AveragedMetric(IMetric metric)
-    {
-        this.name = metric.getName();
-        this.units = metric.getUnits();
-        this.description = metric.getDescription();
-        this.addDataPoint(metric.getValue());
-    }
 
-    public void addDataPoint(double dataPoint)
+    public void addDataPoint(float dataPoint)
     {
-        if (dataPoints.size() >= MAX_DATA_POINTS)
+        if (dataPoints.size() >= 20)
         {
             return;
         }
@@ -85,7 +55,7 @@ public class AveragedMetric implements IMetric
 
     public void discardOutliers()
     {
-        if (dataPoints.size() < MIN_DATA_POINTS_FOR_OUTLIERS)
+        if (dataPoints.size() < 3)
         {
             return;
         }
@@ -94,22 +64,22 @@ public class AveragedMetric implements IMetric
         do
         {
             // Calculate average of values
-            double avg = 0;
+            float avg = 0;
             for (int i = 0; i < dataPoints.size(); i++)
             {
-                avg += dataPoints.get(i).doubleValue();
+                avg += dataPoints.get(i).floatValue();
             }
             avg /= dataPoints.size();
 
             // Calculate std deviation of values & find largest absolute deviation
-            double stdDeviation = 0;
-            double largestAbsDeviation = Float.MIN_VALUE;
+            float stdDeviation = 0;
+            float largestAbsDeviation = Float.MIN_VALUE;
             int largestAbsDeviationIndex = 0;
 
             for (int i = 0; i < dataPoints.size(); i++)
             {
-                double absoluteDeviation = Math.abs(dataPoints.get(i).doubleValue() - avg);
-                if (largestAbsDeviation < absoluteDeviation)
+                float absoluteDeviation = dataPoints.get(i).floatValue() - avg;
+                if (largestAbsDeviation < Math.abs(absoluteDeviation))
                 {
                     largestAbsDeviation = absoluteDeviation;
                     largestAbsDeviationIndex = i;
@@ -119,10 +89,10 @@ public class AveragedMetric implements IMetric
             }
 
             stdDeviation /= dataPoints.size();
-            stdDeviation = (double) Math.sqrt(stdDeviation);
+            stdDeviation = (float) Math.sqrt(stdDeviation);
 
             // Check if it can be discarded
-            double tauDeviation = THOMPSON_TAU_TABLE20[dataPoints.size()-1] * stdDeviation;
+            float tauDeviation = THOMPSON_TAU_TABLE20[dataPoints.size()-1] * stdDeviation;
             if (largestAbsDeviation >= tauDeviation)
             {
                 hasOutliers = true;
@@ -137,73 +107,73 @@ public class AveragedMetric implements IMetric
         } while (hasOutliers && dataPoints.size() > 2);
     }
 
-    public double getMin()
+    public float getMin()
     {
         if (dataPoints.size() == 0)
         {
             return 0;
         }
 
-        double smallestValue = dataPoints.get(0).doubleValue();
+        float smallestValue = dataPoints.get(0).floatValue();
         for (int i = 1; i < dataPoints.size(); i++)
         {
-            if (dataPoints.get(i).doubleValue() < smallestValue)
+            if (dataPoints.get(i).floatValue() < smallestValue)
             {
-                smallestValue = dataPoints.get(i).doubleValue();
+                smallestValue = dataPoints.get(i).floatValue();
             }
         }
 
         return smallestValue;
     }
 
-    public double getMax()
+    public float getMax()
     {
         if (dataPoints.size() == 0)
         {
             return 0;
         }
 
-        double largestValue = dataPoints.get(0).doubleValue();
+        float largestValue = dataPoints.get(0).floatValue();
         for (int i = 1; i < dataPoints.size(); i++)
         {
-            if (dataPoints.get(i).doubleValue() > largestValue)
+            if (dataPoints.get(i).floatValue() > largestValue)
             {
-                largestValue = dataPoints.get(i).doubleValue();
+                largestValue = dataPoints.get(i).floatValue();
             }
         }
 
         return largestValue;
     }
 
-    public double getAvg()
+    public float getAvg()
     {
         if (dataPoints.size() == 0)
         {
             return 0;
         }
 
-        double avgValue = 0;
+        float avgValue = 0;
         for (int i = 0; i < dataPoints.size(); i++)
         {
-            avgValue += dataPoints.get(i).doubleValue();
+            avgValue += dataPoints.get(i).floatValue();
         }
         avgValue /= dataPoints.size();
 
         return avgValue;
     }
 
-    public double getStdDev()
+    public float getStdDev()
     {
-        double avg = getAvg();
-        double stdDeviation = 0;
+        float avg = getAvg();
+        float stdDeviation = 0;
         for (int i = 0; i < dataPoints.size(); i++)
         {
-            double absoluteDeviation = dataPoints.get(i).doubleValue() - avg;
+            float absoluteDeviation = dataPoints.get(i).floatValue() - avg;
             stdDeviation += (absoluteDeviation * absoluteDeviation);
         }
 
         stdDeviation /= dataPoints.size();
-        stdDeviation = (double) Math.sqrt(stdDeviation);
+        stdDeviation = (float) Math.sqrt(stdDeviation);
         return stdDeviation;
     }
 
@@ -280,24 +250,4 @@ public class AveragedMetric implements IMetric
         metricArray.put(obj);
     }
 
-    public double getValue()
-    {
-        discardOutliers();
-        return getAvg();
-    }
-
-    public String getName()
-    {
-        return name;
-    }
-
-    public String getDescription()
-    {
-        return description;
-    }
-
-    public Units getUnits()
-    {
-        return units;
-    }
 };
