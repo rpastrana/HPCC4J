@@ -10,7 +10,7 @@ This repository contains multiple Java-based libraries/tools which can be utiliz
 Feature and change requests are tracked via [JIRA](https://track.hpccsystems.com/secure/Dashboard.jspa).
 Everybody is encouraged to report issues and contribute to the project. When opening JIRA tickets, make sure to set the project as "hpcc4j".
 
-#### Projects contained within:
+#### Projects contained within: test
 - WsClient (./wsclient)
   - Set of APIs which Standardize and facilitate interaction with HPCC Web based Services. [README](https://github.com/hpcc-systems/hpcc4j/blob/master/wsclient/README.md)
   - The project is based on stub code generated from WSDLs using Eclipse tools based on Apache Axis and JSch(Java Secure Channel) for secure ftp transfers
