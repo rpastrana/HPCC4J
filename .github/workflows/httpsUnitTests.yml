@@ -53,7 +53,9 @@ jobs:
     - name: Setup Certs in java
       run: |
         docker cp ${{ env.PLATFORM_CONTAINER_NAME }}:/home/hpcc/certificate/certificate.pem certificate.pem
-        keytool -import -trustcacerts -cacerts -storepass changeit -noprompt -alias hpccsystems -file certificate.pem
+        CERTFILE=$(realpath certificate.pem)
+        keytool -importcert -v -trustcacerts -storepass changeit -noprompt -alias hpccsystems -file ${CERTFILE}
+        keytool -list
 
     - name: HPCCSystems https setup and start
       run: |
