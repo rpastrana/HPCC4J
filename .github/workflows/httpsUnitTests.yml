@@ -54,8 +54,8 @@ jobs:
       run: |
         docker cp ${{ env.PLATFORM_CONTAINER_NAME }}:/home/hpcc/certificate/certificate.pem certificate.pem
         CERTFILE=$(realpath certificate.pem)
-        keytool -importcert -v -trustcacerts -storepass changeit -noprompt -alias hpccsystems -file ${CERTFILE}
-        keytool -list
+        keytool -keystore /opt/hostedtoolcache/jdk/8.0.292/x64/lib/security/cacerts -importcert -v -trustcacerts -storepass changeit -noprompt -alias hpccsystems -file ${CERTFILE}
+        keytool -keystore /opt/hostedtoolcache/jdk/8.0.292/x64/lib/security/cacerts -list | grep hpccsystems
 
     - name: HPCCSystems https setup and start
       run: |
