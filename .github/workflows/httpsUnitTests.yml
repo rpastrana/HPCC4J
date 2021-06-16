@@ -44,11 +44,19 @@ jobs:
     - name: HPCCSystems Datafile Setup
       run: |
         docker exec ${{ env.PLATFORM_CONTAINER_NAME }} /etc/init.d/hpcc-init start
+    
+        docker exec ${{ env.PLATFORM_CONTAINER_NAME }} cat /var/log/HPCCSystems/myesp/esp.log
+
+        wget https://localhost:18010/WsDFUXRef/version_
+        wget https://localhost:18510/WsSQL/version_
+        wget https://localhost:18010/WsWorkunits/version_
+        
         wget -q https://raw.githubusercontent.com/Michael-Gardner/hpccsystems-java-project-testbed/main/generatedata.sh
         chmod +x generatedata.sh
         docker cp generatedata.sh ${{ env.PLATFORM_CONTAINER_NAME }}:/home/hpcc/generatedata.sh
         docker exec ${{ env.PLATFORM_CONTAINER_NAME }} /home/hpcc/generatedata.sh
         docker exec ${{ env.PLATFORM_CONTAINER_NAME }} /etc/init.d/hpcc-init stop
+        
 
     - name: Setup Certs in java
       run: |
