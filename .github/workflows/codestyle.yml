@@ -2,15 +2,11 @@ name: reviewcodestyle
 on: pull_request
 
 jobs:
-  checkstyle_job:
+
+  formatting:
     runs-on: ubuntu-latest
-    name: Checkstyle job
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Run check style
-      uses: nikitasavinov/checkstyle-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        reporter: 'github-pr-check'
-        tool_name: 'testtool'
+      - uses: actions/checkout@v2 # v2 minimum required
+      - uses: axel-op/googlejavaformat-action@v3
+        with:
+          args: "--set-exit-if-changed"
