@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "WSDL Generation",
+            "type": "shell",
+            "command": "python",
+            "args": ["wsclient/utils/wsInterfaceUpdater.py", "-b", "${input:branchName}", "-t", "${input:hpccHost}"]
+        }
+    ],
+    //172.17.58.37
+    "inputs": [
+        {
+            "id": "hpccHost",
+            "description": "Enter HPCC Host",
+            "default": "localhost",
+            "type": "promptString"
+        },
+        {
+            "id": "branchName",
+            "description": "Enter Branch Name",
+            "default": "candidate-9.0.x",
+            "type": "promptString"
+        }
+    ]
+}

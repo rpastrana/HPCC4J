@@ -289,16 +289,22 @@ def build_hpcc4j():
     #working_directory = f"{os.getcwd()}/hpcc4j"
     working_directory = f"{os.getcwd()}"
     logging.debug(f"build_hpcc4j_command = {build_hpcc4j_command}")
-    process = subprocess.Popen(build_hpcc4j_command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_directory)
-    for line in process.stdout:
-        logging.info(str(line, 'utf-8'))
+    process = subprocess.Popen(build_hpcc4j_command.split(), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=working_directory)
+    stdout, stderr = process.communicate()
+    if process.returncode == 0:
+        print("HPCC4j build successful")
+        print(stdout.decode("utf-8"))
+    else:
+        print("HPCC4j build failed")
+        print(stdout.decode("utf-8"))
+        print(stderr.decode("utf-8"))
 
 def generate_stubcode(service):
     wsdl_output_path = f"{os.getcwd()}/wsclient/src/main/resources/WSDLs"
     generate_stubcode_command = f"mvn -Pgenerate-{service}-stub process-resources"
     logging.debug(f"generate_stubcode_command = {generate_stubcode_command}")
     working_directory = f"{os.getcwd()}/wsclient"
-    process = subprocess.Popen(generate_stubcode_command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_directory)
+    process = subprocess.Popen(generate_stubcode_command.split(), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_directory)
     for line in process.stdout:
         logging.info(str(line, 'utf-8'))
 
