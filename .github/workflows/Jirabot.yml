@@ -66,10 +66,10 @@ jobs:
                         transitions = jira.transitions(issue)
                         result += 'Error: Transition: "' + transition + '" failed with: "' + str(error) + '" Valid transitions=' + str(transitions) + '\n'
 
-                if issue.fields.customfield_10010 is None:
-                    issue.update(fields={'customfield_10010': pull_url})
+                if issue.fields.customfield_10031 is None:
+                    issue.update(fields={'customfield_10031': pull_url})
                     result += 'Updated PR\n'
-                elif issue.fields.customfield_10010 is not None and issue.fields.customfield_10010 != pull_url:
+                elif issue.fields.customfield_10031 is not None and issue.fields.customfield_10031 != pull_url:
                     result += 'Additional PR: ' + pull_url + '\n'
 
                 if issue.fields.assignee is None:
