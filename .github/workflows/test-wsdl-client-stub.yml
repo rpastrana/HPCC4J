@@ -55,7 +55,7 @@ jobs:
         run: |
           echo "Checking for generated stub files..."
           find wsclient/src/main/java -name "*.java" -newer wsclient/pom.xml | head -10 || true
-
+          
           # Check if compilation still works after any WSDL changes
           echo "Testing compilation of wsclient module..."
           mvn -B compile -pl wsclient -q
