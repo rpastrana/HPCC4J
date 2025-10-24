@@ -23,13 +23,15 @@ jobs:
 
     steps:
     - name: Setup JDK 11
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v4
       with:
-        java-version: 11
+        java-version: '11'
+        distribution: 'temurin'
 
-    - uses: "actions/setup-python@v2"
+    - name: Setup Python 3.11
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.8"
+        python-version: '3.11'
 
     - name: "Install Python dependencies"
       run: |
@@ -71,18 +73,29 @@ jobs:
         def getTagVersionForCmd(cmd):
             versionPattern = re.compile(r'.*hpcc4j_([0-9]+\.[0-9]+\.[0-9]+).*')
 
-            # Get latest release version
-            import shlex
-            cmd_args = shlex.split(cmd)
-            gitTagProcess = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, shell=False)
-            (output, err) = gitTagProcess.communicate()
-            gitTagProcessStatus = gitTagProcess.wait()
-
-            if gitTagProcessStatus != 0:
-                print('Unable to retrieve latest git tag. With error: ' + str(err))
+            # Handle shell pipe commands by extracting git command and using Python for "head -n 1"
+            try:
+                if ' | head -n 1' in cmd:
+                    # Extract git command without shell pipe
+                    git_cmd = cmd.replace(' | head -n 1', '').strip()
+                    cmd_args = ['git'] + git_cmd.split()[1:]  # Split git command properly
+                else:
+                    import shlex
+                    cmd_args = shlex.split(cmd)
+                
+                result = subprocess.run(cmd_args, capture_output=True, text=True, check=True)
+                output_lines = result.stdout.strip().splitlines()
+                
+                if not output_lines or not output_lines[0]:
+                    print('No git tags found')
+                    return None
+                
+                # Get the first line (equivalent to head -n 1)
+                latestGitTag = output_lines[0].strip()
+                
+            except subprocess.CalledProcessError as e:
+                print(f'Unable to retrieve latest git tag. Error: {e}')
                 return None
-
-            latestGitTag = str(output)
 
             versionMatch = versionPattern.match(latestGitTag)
             if versionMatch:
@@ -125,7 +138,7 @@ jobs:
             print(f'Using manually specified version: {manual_version}')
             try:
                 targetVersion = extractVersion(manual_version)
-            except:
+            except (ValueError, IndexError) as e:
                 print(f'Invalid manual version format: {manual_version}')
                 sys.exit(1)
         else:
@@ -262,7 +275,7 @@ jobs:
 
     # speed things up with caching from https://docs.github.com/en/actions/guides/building-and-testing-java-with-maven
     - name: Cache Maven packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -322,20 +335,22 @@ jobs:
             tree = ET.parse(report_path)
             root = tree.getroot()
             
-            # Look for failures or errors that aren't categorized as known issues
-            failures = root.findall('.//failure')
-            errors = root.findall('.//error')
+            # Look for testcase elements with failures or errors
+            testcases = root.findall('.//testcase')
             
-            for failure in failures + errors:
-              test_case = failure.getparent()
-              class_name = test_case.get('classname', 'Unknown')
-              test_name = test_case.get('name', 'Unknown')
-              message = failure.get('message', 'Unknown error')
+            for testcase in testcases:
+              failures = testcase.findall('.//failure')
+              errors = testcase.findall('.//error')
               
-              # Check if this is a known server issue (these should be warnings, not errors)
-              if 'KnownServerIssue' not in class_name and 'KnownServerIssueTests' not in str(failure.text):
-                hadErrors = True
-                print(f"::error file={class_name}.{test_name} title=Unexpected Test Failure: {message}")
+              for failure in failures + errors:
+                class_name = testcase.get('classname', 'Unknown')
+                test_name = testcase.get('name', 'Unknown')
+                message = failure.get('message', 'Unknown error')
+                
+                # Check if this is a known server issue (these should be warnings, not errors)
+                if 'KnownServerIssue' not in class_name and 'KnownServerIssueTests' not in str(failure.text):
+                  hadErrors = True
+                  print(f"::error file={class_name}.{test_name} title=Unexpected Test Failure: {message}")
               
           except Exception as e:
             print(f"Error parsing surefire report {report_path}: {e}")
@@ -350,7 +365,7 @@ jobs:
           print("::notice title=Test Suite Complete::All failures are properly categorized as known server issues.")
 
     - name: Upload Test Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: known-server-issues-test-results-${{ github.event.inputs.security_mode }}
