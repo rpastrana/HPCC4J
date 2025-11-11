@@ -1,7 +1,7 @@
 name: Question
 description: Ask a question about HPCC4J usage, configuration, or best practices
 title: "[QUESTION]: "
-labels: ["question", "needs-triage"]
+labels: ["question"]
 body:
   - type: markdown
     attributes:
@@ -17,33 +17,20 @@ body:
     id: question
     attributes:
       label: Question
-      description: What would you like to know?
-      placeholder: Ask your question here...
-    validations:
-      required: true
-
-  - type: dropdown
-    id: topic-area
-    attributes:
-      label: Topic Area
-      description: Which area does your question relate to?
-      options:
-        - Connection/Authentication
-        - Web Services (wsclient)
-        - File Operations (dfsclient)
-        - Spark Integration (spark-hpcc)
-        - Data Types/Schema
-        - Performance/Optimization
-        - Configuration
-        - Build/Deployment
-        - Other
+      description: What would you like to know? Include any relevant context about what you're trying to accomplish.
+      placeholder: |
+        I'm trying to [what you want to do]...
+        
+        I've tried [what you've attempted]...
+        
+        [Your specific question]
     validations:
       required: true
 
   - type: dropdown
     id: question-module
     attributes:
-      label: Related Module
+      label: Related Module (if known)
       description: Which HPCC4J module is your question about?
       options:
         - wsclient
@@ -54,49 +41,22 @@ body:
         - rdf2hpcc
         - General/Multiple modules
         - Not sure
-    validations:
-      required: true
 
   - type: textarea
-    id: context
+    id: code-or-details
     attributes:
-      label: Context
-      description: What are you trying to accomplish? What have you tried so far?
-      placeholder: |
-        I'm trying to...
-        I've attempted...
-        I expected...
-    validations:
-      required: true
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: Environment (if relevant)
-      description: Provide environment details if related to your question
-      placeholder: |
-        - HPCC Systems Version: 9.6.0
-        - HPCC4J Version: 9.6.2
-        - Java Version: Java 11
-        - Module: wsclient
-
-  - type: textarea
-    id: code-sample
-    attributes:
-      label: Code Sample (if applicable)
-      description: Share relevant code that relates to your question
+      label: Code Sample or Additional Details
+      description: Share any relevant code, error messages, or environment details
       placeholder: |
         ```java
         // Your code here
         ```
-      render: java
-
-  - type: textarea
-    id: additional-info
-    attributes:
-      label: Additional Information
-      description: Any other details that might be helpful
-      placeholder: Error messages, logs, documentation you've reviewed, etc.
+        
+        Or provide environment details:
+        - HPCC Systems Version: 
+        - HPCC4J Version: 
+        - Java Version: 
+      render: markdown
 
   - type: checkboxes
     id: checklist

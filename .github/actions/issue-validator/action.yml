@@ -33,15 +33,49 @@ runs:
           
           const issueBody = issue.body || '';
           const issueTitle = issue.title || '';
+          const issueLabels = issue.labels.map(label => label.name);
           
-          // Define required sections for a complete issue
-          const requiredSections = [
-            { name: 'Description', keywords: ['description', 'summary', 'problem', 'issue'] },
-            { name: 'Steps to Reproduce', keywords: ['steps', 'reproduce', 'reproduction', 'how to'] },
-            { name: 'Expected Behavior', keywords: ['expected', 'should'] },
-            { name: 'Actual Behavior', keywords: ['actual', 'currently', 'instead', 'observed'] },
-            { name: 'Environment/Configuration', keywords: ['environment', 'version', 'configuration', 'setup', 'cluster', 'java version', 'hpcc version', 'module'] }
-          ];
+          // Determine issue type from labels or title
+          const isBugReport = issueLabels.includes('bug') || issueTitle.toLowerCase().includes('[bug]');
+          const isFeatureRequest = issueLabels.includes('enhancement') || issueTitle.toLowerCase().includes('[feature]');
+          const isQuestion = issueLabels.includes('question') || issueTitle.toLowerCase().includes('[question]');
+          
+          // Define required sections based on issue type
+          let requiredSections = [];
+          
+          if (isBugReport) {
+            // Bug report sections (from bug_report.yml template)
+            requiredSections = [
+              { name: 'Description', keywords: ['### description', 'description:', '## description'], required: true },
+              { name: 'Steps to Reproduce', keywords: ['### steps to reproduce', 'steps to reproduce:', '## steps'], required: true },
+              { name: 'Expected Behavior', keywords: ['### expected behavior', 'expected behavior:', '## expected'], required: true },
+              { name: 'Actual Behavior', keywords: ['### actual behavior', 'actual behavior:', '## actual'], required: true },
+              { name: 'HPCC Systems Version', keywords: ['### hpcc systems version', 'hpcc systems version:', 'hpcc version:'], required: true },
+              { name: 'HPCC4J Module', keywords: ['### hpcc4j module', 'hpcc4j module:', '## hpcc4j module'], required: true },
+              { name: 'HPCC4J Version', keywords: ['### hpcc4j version', 'hpcc4j version:'], required: true },
+              { name: 'Java Version', keywords: ['### java version', 'java version:'], required: true },
+              { name: 'Environment/Configuration', keywords: ['### environment/configuration', 'environment:', 'configuration:'], required: true }
+            ];
+          } else if (isFeatureRequest) {
+            // Feature request sections (from feature_request.yml template)
+            requiredSections = [
+              { name: 'Feature Description', keywords: ['### feature description', 'feature description:', '## feature'], required: true },
+              { name: 'Problem Statement', keywords: ['### problem statement', 'problem statement:', '## problem'], required: true },
+              { name: 'Proposed Solution', keywords: ['### proposed solution', 'proposed solution:', '## solution'], required: true },
+              { name: 'Affected Module(s)', keywords: ['### affected module', 'affected module:', '## module'], required: true }
+            ];
+          } else if (isQuestion) {
+            // Question sections (from question.yml template) - simplified
+            requiredSections = [
+              { name: 'Question', keywords: ['### question', 'question:', '## question'], required: true }
+            ];
+          } else {
+            // Generic validation for free-form issues (legacy or manually created)
+            requiredSections = [
+              { name: 'Description', keywords: ['description', 'summary', 'problem', 'issue'], required: true },
+              { name: 'Context/Details', keywords: ['context', 'details', 'information', 'background'], required: true }
+            ];
+          }
           
           // Analyze the issue content
           const missingInfo = [];
@@ -53,15 +87,17 @@ runs:
               issueTitle.toLowerCase().includes(keyword.toLowerCase())
             );
             
-            if (!hasSection) {
+            if (!hasSection && section.required) {
               missingInfo.push(section.name);
-            } else {
+            } else if (hasSection) {
               presentInfo.push(section.name);
             }
           }
           
           // Check if issue body is too short (likely incomplete)
-          const isBodyTooShort = issueBody.length < 100;
+          // More lenient for questions since they're simpler
+          const minLength = isQuestion ? 30 : (isBugReport ? 150 : 100);
+          const isBodyTooShort = issueBody.length < minLength;
           const isComplete = missingInfo.length === 0 && !isBodyTooShort;
           
           // Prepare analysis comment
@@ -112,36 +148,62 @@ runs:
               analysisComment += shortDescText;
             }
             
+            // Provide context-appropriate guidance
             const checklistHeader = isRevalidation 
-              ? '### 📋 Reminder: Complete Issue Checklist\n\n'
-              : '### 📋 Checklist for a Complete Issue Report\n\n';
+              ? '### 📋 Reminder: Required Information\n\n'
+              : '### 📋 Required Information\n\n';
             
-            const checklistIntro = isRevalidation
-              ? 'Please include:\n\n'
-              : 'To help us resolve your issue quickly, please ensure you have included:\n\n';
+            analysisComment += checklistHeader;
             
-            analysisComment += checklistHeader + checklistIntro;
-            analysisComment += '1. **Detailed Description**: A clear and concise description of the issue\n';
-            analysisComment += '2. **Steps to Reproduce**: Numbered steps showing how to reproduce the issue\n';
-            analysisComment += '   ```\n';
-            analysisComment += '   1. Connect to HPCC cluster at...\n';
-            analysisComment += '   2. Call method...\n';
-            analysisComment += '   3. Observe error...\n';
-            analysisComment += '   ```\n';
-            analysisComment += '3. **Expected Behavior**: What you expected to happen\n';
-            analysisComment += '4. **Actual Behavior**: What actually happened (include error messages, stack traces)\n';
-            analysisComment += '5. **Environment/Configuration Details**:\n';
-            analysisComment += '   - HPCC Systems version (e.g., 9.6.0)\n';
-            analysisComment += '   - HPCC4J module and version (e.g., wsclient 9.6.2)\n';
-            analysisComment += '   - Java version (e.g., Java 11)\n';
-            analysisComment += '   - Connection details (ESP endpoint, authentication method)\n';
-            analysisComment += '   - Relevant code snippets\n\n';
-            analysisComment += '6. **Additional Context**: Any other relevant information (logs, configurations, etc.)\n\n';
+            if (isBugReport) {
+              // Bug report specific guidance
+              analysisComment += 'For bug reports, please ensure you have:\n\n';
+              analysisComment += '1. **Description**: Clear description of the bug\n';
+              analysisComment += '2. **Steps to Reproduce**: Numbered steps to reproduce\n';
+              analysisComment += '   ```\n';
+              analysisComment += '   1. Connect to HPCC cluster at...\n';
+              analysisComment += '   2. Call method...\n';
+              analysisComment += '   3. Observe error...\n';
+              analysisComment += '   ```\n';
+              analysisComment += '3. **Expected vs Actual Behavior**: What should happen vs what actually happens\n';
+              analysisComment += '4. **Environment Details**:\n';
+              analysisComment += '   - HPCC Systems version (e.g., 9.6.0)\n';
+              analysisComment += '   - HPCC4J module and version (e.g., wsclient 9.6.2)\n';
+              analysisComment += '   - Java version (e.g., Java 11)\n';
+              analysisComment += '   - Configuration (ESP endpoint, authentication, etc.)\n';
+              analysisComment += '5. **Code Sample**: Minimal reproducible code snippet\n';
+              analysisComment += '6. **Error Details**: Full error messages and stack traces\n\n';
+              analysisComment += '💡 **Tip**: Check the [Common Issues and Solutions wiki](https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions) first!\n\n';
+            } else if (isFeatureRequest) {
+              // Feature request specific guidance
+              analysisComment += 'For feature requests, please include:\n\n';
+              analysisComment += '1. **Feature Description**: What you want to add/change\n';
+              analysisComment += '2. **Problem Statement**: What problem does this solve?\n';
+              analysisComment += '3. **Proposed Solution**: How should it work?\n';
+              analysisComment += '4. **Affected Module(s)**: Which HPCC4J modules would be affected\n';
+              analysisComment += '5. **Example Usage**: Show how you would use this feature\n';
+              analysisComment += '6. **Alternatives**: Any workarounds or alternatives considered\n\n';
+            } else if (isQuestion) {
+              // Question specific guidance - simplified
+              analysisComment += 'For questions, please include:\n\n';
+              analysisComment += '1. **Your Question**: What do you want to know?\n';
+              analysisComment += '2. **Context**: What are you trying to accomplish? What have you tried?\n';
+              analysisComment += '3. **Code/Details** (optional): Relevant code snippets, error messages, or environment details\n\n';
+              analysisComment += '💡 **Tip**: Check the [Common Issues wiki](https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions) - your answer might already be there!\n\n';
+            } else {
+              // Generic guidance
+              analysisComment += 'Please provide:\n\n';
+              analysisComment += '1. **Clear Description**: What is this issue about?\n';
+              analysisComment += '2. **Context**: Background information and details\n';
+              analysisComment += '3. **Environment** (if applicable): Versions and configuration\n';
+              analysisComment += '4. **Examples**: Code snippets or use cases\n\n';
+            }
+            
             analysisComment += '---\n\n';
             
             const footerText = isRevalidation
               ? '*Automatic re-validation triggered by issue update.*\n'
-              : '*This analysis was performed automatically. Please update your issue with any missing information to help us assist you better.*\n';
+              : '*This analysis was performed automatically. Please update your issue with any missing information.*\n';
             analysisComment += footerText;
           }
           
@@ -247,8 +309,11 @@ runs:
           }
           
           // Log summary
+          const issueType = isBugReport ? 'Bug Report' : (isFeatureRequest ? 'Feature Request' : (isQuestion ? 'Question' : 'Generic'));
           console.log('\n📊 Analysis Summary:');
+          console.log(`   Issue Type: ${issueType}`);
           console.log(`   Complete: ${isComplete ? '✅' : '❌'}`);
           console.log(`   Present Info: ${presentInfo.join(', ') || 'None'}`);
           console.log(`   Missing Info: ${missingInfo.join(', ') || 'None'}`);
-          console.log(`   Body Length: ${issueBody.length} characters`);
+          console.log(`   Body Length: ${issueBody.length} characters (min: ${minLength})`);
+          console.log(`   Labels: ${issueLabels.join(', ') || 'None'}`);
