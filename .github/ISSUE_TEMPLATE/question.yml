@@ -1,0 +1,110 @@
+name: Question
+description: Ask a question about HPCC4J usage, configuration, or best practices
+title: "[QUESTION]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about using HPCC4J? We're here to help!
+        
+        **Before asking**, please check:
+        - [Common Issues and Solutions wiki](https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions)
+        - [HPCC4J Documentation](https://github.com/hpcc-systems/HPCC4J)
+        - Existing issues and discussions
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: Ask your question here...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic-area
+    attributes:
+      label: Topic Area
+      description: Which area does your question relate to?
+      options:
+        - Connection/Authentication
+        - Web Services (wsclient)
+        - File Operations (dfsclient)
+        - Spark Integration (spark-hpcc)
+        - Data Types/Schema
+        - Performance/Optimization
+        - Configuration
+        - Build/Deployment
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: question-module
+    attributes:
+      label: Related Module
+      description: Which HPCC4J module is your question about?
+      options:
+        - wsclient
+        - dfsclient
+        - spark-hpcc
+        - commons-hpcc
+        - clienttools
+        - rdf2hpcc
+        - General/Multiple modules
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to accomplish? What have you tried so far?
+      placeholder: |
+        I'm trying to...
+        I've attempted...
+        I expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (if relevant)
+      description: Provide environment details if related to your question
+      placeholder: |
+        - HPCC Systems Version: 9.6.0
+        - HPCC4J Version: 9.6.2
+        - Java Version: Java 11
+        - Module: wsclient
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample (if applicable)
+      description: Share relevant code that relates to your question
+      placeholder: |
+        ```java
+        // Your code here
+        ```
+      render: java
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any other details that might be helpful
+      placeholder: Error messages, logs, documentation you've reviewed, etc.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm before submitting
+      options:
+        - label: I have checked the [Common Issues and Solutions wiki](https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions)
+          required: true
+        - label: I have searched existing issues and discussions
+          required: true
