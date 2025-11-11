@@ -1,0 +1,229 @@
+name: 'Issue Validator'
+description: 'Analyzes GitHub issues for completeness, ensuring all required information is provided for effective triage'
+author: 'HPCC4J Team'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  issue-number:
+    description: 'Issue number to analyze'
+    required: true
+  is-revalidation:
+    description: 'Whether this is a re-validation (true) or initial validation (false)'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Analyze Issue Content
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const isRevalidation = '${{ inputs.is-revalidation }}' === 'true';
+          
+          // Get the issue details
+          const { data: issue } = await github.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: parseInt('${{ inputs.issue-number }}')
+          });
+          
+          const issueBody = issue.body || '';
+          const issueTitle = issue.title || '';
+          
+          // Define required sections for a complete issue
+          const requiredSections = [
+            { name: 'Description', keywords: ['description', 'summary', 'problem', 'issue'] },
+            { name: 'Steps to Reproduce', keywords: ['steps', 'reproduce', 'reproduction', 'how to'] },
+            { name: 'Expected Behavior', keywords: ['expected', 'should'] },
+            { name: 'Actual Behavior', keywords: ['actual', 'currently', 'instead', 'observed'] },
+            { name: 'Environment/Configuration', keywords: ['environment', 'version', 'configuration', 'setup', 'cluster', 'java version', 'hpcc version', 'module'] }
+          ];
+          
+          // Analyze the issue content
+          const missingInfo = [];
+          const presentInfo = [];
+          
+          for (const section of requiredSections) {
+            const hasSection = section.keywords.some(keyword => 
+              issueBody.toLowerCase().includes(keyword.toLowerCase()) ||
+              issueTitle.toLowerCase().includes(keyword.toLowerCase())
+            );
+            
+            if (!hasSection) {
+              missingInfo.push(section.name);
+            } else {
+              presentInfo.push(section.name);
+            }
+          }
+          
+          // Check if issue body is too short (likely incomplete)
+          const isBodyTooShort = issueBody.length < 100;
+          const isComplete = missingInfo.length === 0 && !isBodyTooShort;
+          
+          // Prepare analysis comment
+          const headerEmoji = isRevalidation ? '🔄' : '🤖';
+          const headerText = isRevalidation ? 'Issue Re-validation Analysis' : 'Issue Validation Analysis';
+          let analysisComment = `## ${headerEmoji} ${headerText}\n\n`;
+          
+          if (isComplete) {
+            const thankYouText = isRevalidation 
+              ? 'Thank you for updating your issue with the additional details. This issue is now ready for review!'
+              : 'Thank you for providing a detailed issue report!';
+            
+            analysisComment += isRevalidation 
+              ? '✅ **Great! This issue now contains all required information!**\n\n'
+              : '✅ **This issue appears to contain all required information!**\n\n';
+            
+            analysisComment += 'The following sections were identified:\n';
+            presentInfo.forEach(info => {
+              analysisComment += `- ✅ ${info}\n`;
+            });
+            analysisComment += `\n${thankYouText}\n`;
+          } else {
+            analysisComment += isRevalidation
+              ? '⚠️ **This issue still appears to be missing some important information.**\n\n'
+              : '⚠️ **This issue may be missing some important information.**\n\n';
+            
+            if (presentInfo.length > 0) {
+              analysisComment += '**Information provided:**\n';
+              presentInfo.forEach(info => {
+                analysisComment += `- ✅ ${info}\n`;
+              });
+              analysisComment += '\n';
+            }
+            
+            if (missingInfo.length > 0) {
+              const missingHeader = isRevalidation ? '**Still missing:**\n' : '**Potentially missing information:**\n';
+              analysisComment += missingHeader;
+              missingInfo.forEach(info => {
+                analysisComment += `- ⚠️ ${info}\n`;
+              });
+              analysisComment += '\n';
+            }
+            
+            if (isBodyTooShort) {
+              const shortDescText = isRevalidation 
+                ? '- ⚠️ The issue description is still quite brief\n\n'
+                : '- ⚠️ The issue description appears to be very brief\n\n';
+              analysisComment += shortDescText;
+            }
+            
+            const checklistHeader = isRevalidation 
+              ? '### 📋 Reminder: Complete Issue Checklist\n\n'
+              : '### 📋 Checklist for a Complete Issue Report\n\n';
+            
+            const checklistIntro = isRevalidation
+              ? 'Please include:\n\n'
+              : 'To help us resolve your issue quickly, please ensure you have included:\n\n';
+            
+            analysisComment += checklistHeader + checklistIntro;
+            analysisComment += '1. **Detailed Description**: A clear and concise description of the issue\n';
+            analysisComment += '2. **Steps to Reproduce**: Numbered steps showing how to reproduce the issue\n';
+            analysisComment += '   ```\n';
+            analysisComment += '   1. Connect to HPCC cluster at...\n';
+            analysisComment += '   2. Call method...\n';
+            analysisComment += '   3. Observe error...\n';
+            analysisComment += '   ```\n';
+            analysisComment += '3. **Expected Behavior**: What you expected to happen\n';
+            analysisComment += '4. **Actual Behavior**: What actually happened (include error messages, stack traces)\n';
+            analysisComment += '5. **Environment/Configuration Details**:\n';
+            analysisComment += '   - HPCC Systems version (e.g., 9.6.0)\n';
+            analysisComment += '   - HPCC4J module and version (e.g., wsclient 9.6.2)\n';
+            analysisComment += '   - Java version (e.g., Java 11)\n';
+            analysisComment += '   - Connection details (ESP endpoint, authentication method)\n';
+            analysisComment += '   - Relevant code snippets\n\n';
+            analysisComment += '6. **Additional Context**: Any other relevant information (logs, configurations, etc.)\n\n';
+            analysisComment += '---\n\n';
+            
+            const footerText = isRevalidation
+              ? '*Automatic re-validation triggered by issue update.*\n'
+              : '*This analysis was performed automatically. Please update your issue with any missing information to help us assist you better.*\n';
+            analysisComment += footerText;
+          }
+          
+          // Post the analysis as a comment
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue.number,
+            body: analysisComment
+          });
+          
+          // Manage labels based on completeness
+          const hasNeedsMoreInfo = issue.labels.some(label => label.name === 'needs-more-info');
+          const hasReadyForReview = issue.labels.some(label => label.name === 'ready-for-review');
+          
+          if (isComplete) {
+            // Remove needs-more-info label if present
+            if (hasNeedsMoreInfo) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  name: 'needs-more-info'
+                });
+                console.log('✅ Removed needs-more-info label');
+              } catch (error) {
+                console.log('⚠️ Could not remove needs-more-info label:', error.message);
+              }
+            }
+            
+            // Ensure ready-for-review label is added
+            if (!hasReadyForReview) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['ready-for-review']
+                });
+                console.log('✅ Added ready-for-review label');
+              } catch (error) {
+                console.log('⚠️ Could not add ready-for-review label:', error.message);
+                console.log('💡 Tip: Create the "ready-for-review" label in your repository');
+              }
+            }
+          } else {
+            // Ensure needs-more-info label is present
+            if (!hasNeedsMoreInfo) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: ['needs-more-info']
+                });
+                console.log('✅ Added needs-more-info label');
+              } catch (error) {
+                console.log('⚠️ Could not add needs-more-info label:', error.message);
+                console.log('💡 Tip: Create the "needs-more-info" label in your repository');
+              }
+            }
+            
+            // Remove ready-for-review label if present
+            if (hasReadyForReview) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  name: 'ready-for-review'
+                });
+                console.log('✅ Removed ready-for-review label');
+              } catch (error) {
+                console.log('⚠️ Could not remove ready-for-review label:', error.message);
+              }
+            }
+          }
+          
+          // Log summary
+          console.log('\n📊 Analysis Summary:');
+          console.log(`   Complete: ${isComplete ? '✅' : '❌'}`);
+          console.log(`   Present Info: ${presentInfo.join(', ') || 'None'}`);
+          console.log(`   Missing Info: ${missingInfo.join(', ') || 'None'}`);
+          console.log(`   Body Length: ${issueBody.length} characters`);

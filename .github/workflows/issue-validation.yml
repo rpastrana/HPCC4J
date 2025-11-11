@@ -2,7 +2,7 @@ name: Issue Validation
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited, labeled]
 
 permissions:
   issues: write
@@ -11,128 +11,18 @@ permissions:
 jobs:
   validate-issue:
     runs-on: ubuntu-latest
+    # Run on newly opened issues, OR edited issues with needs-more-info, OR when ready-for-review is added
+    if: |
+      github.event.action == 'opened' ||
+      (github.event.action == 'edited' && contains(github.event.issue.labels.*.name, 'needs-more-info')) ||
+      (github.event.action == 'labeled' && github.event.label.name == 'ready-for-review')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Analyze Issue with Copilot
-        uses: actions/github-script@v7
+      - name: Validate Issue Completeness
+        uses: ./.github/actions/issue-validator
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue = context.payload.issue;
-            const issueBody = issue.body || '';
-            const issueTitle = issue.title || '';
-            
-            // Define required sections for a complete issue
-            const requiredSections = [
-              { name: 'Description', keywords: ['description', 'summary', 'problem', 'issue'] },
-              { name: 'Steps to Reproduce', keywords: ['steps', 'reproduce', 'reproduction', 'how to'] },
-              { name: 'Expected Behavior', keywords: ['expected', 'should'] },
-              { name: 'Actual Behavior', keywords: ['actual', 'currently', 'instead', 'observed'] },
-              { name: 'Environment/Configuration', keywords: ['environment', 'version', 'configuration', 'setup', 'cluster', 'java version', 'hpcc version', 'module'] }
-            ];
-            
-            // Analyze the issue content
-            const missingInfo = [];
-            const presentInfo = [];
-            
-            for (const section of requiredSections) {
-              const hasSection = section.keywords.some(keyword => 
-                issueBody.toLowerCase().includes(keyword.toLowerCase()) ||
-                issueTitle.toLowerCase().includes(keyword.toLowerCase())
-              );
-              
-              if (!hasSection) {
-                missingInfo.push(section.name);
-              } else {
-                presentInfo.push(section.name);
-              }
-            }
-            
-            // Check if issue body is too short (likely incomplete)
-            const isBodyTooShort = issueBody.length < 100;
-            
-            // Prepare analysis comment
-            let analysisComment = '## 🤖 Issue Validation Analysis\n\n';
-            
-            if (missingInfo.length === 0 && !isBodyTooShort) {
-              analysisComment += '✅ **This issue appears to contain all required information!**\n\n';
-              analysisComment += 'The following sections were identified:\n';
-              presentInfo.forEach(info => {
-                analysisComment += `- ✅ ${info}\n`;
-              });
-              analysisComment += '\nThank you for providing a detailed issue report!\n';
-            } else {
-              analysisComment += '⚠️ **This issue may be missing some important information.**\n\n';
-              
-              if (presentInfo.length > 0) {
-                analysisComment += '**Information provided:**\n';
-                presentInfo.forEach(info => {
-                  analysisComment += `- ✅ ${info}\n`;
-                });
-                analysisComment += '\n';
-              }
-              
-              if (missingInfo.length > 0) {
-                analysisComment += '**Potentially missing information:**\n';
-                missingInfo.forEach(info => {
-                  analysisComment += `- ⚠️ ${info}\n`;
-                });
-                analysisComment += '\n';
-              }
-              
-              if (isBodyTooShort) {
-                analysisComment += '- ⚠️ The issue description appears to be very brief\n\n';
-              }
-              
-              analysisComment += '### 📋 Checklist for a Complete Issue Report\n\n';
-              analysisComment += 'To help us resolve your issue quickly, please ensure you have included:\n\n';
-              analysisComment += '1. **Detailed Description**: A clear and concise description of the issue\n';
-              analysisComment += '2. **Steps to Reproduce**: Numbered steps showing how to reproduce the issue\n';
-              analysisComment += '   ```\n';
-              analysisComment += '   1. Connect to HPCC cluster at...\n';
-              analysisComment += '   2. Call method...\n';
-              analysisComment += '   3. Observe error...\n';
-              analysisComment += '   ```\n';
-              analysisComment += '3. **Expected Behavior**: What you expected to happen\n';
-              analysisComment += '4. **Actual Behavior**: What actually happened (include error messages, stack traces)\n';
-              analysisComment += '5. **Environment/Configuration Details**:\n';
-              analysisComment += '   - HPCC Systems version (e.g., 9.6.0)\n';
-              analysisComment += '   - HPCC4J module and version (e.g., wsclient 9.6.2)\n';
-              analysisComment += '   - Java version (e.g., Java 11)\n';
-              analysisComment += '   - Connection details (ESP endpoint, authentication method)\n';
-              analysisComment += '   - Relevant code snippets\n\n';
-              analysisComment += '6. **Additional Context**: Any other relevant information (logs, configurations, etc.)\n\n';
-              analysisComment += '---\n\n';
-              analysisComment += '*This analysis was performed automatically. Please update your issue with any missing information to help us assist you better.*\n';
-            }
-            
-            // Post the analysis as a comment
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              body: analysisComment
-            });
-            
-            // Add label based on completeness
-            const labels = [];
-            if (missingInfo.length > 0 || isBodyTooShort) {
-              labels.push('needs-more-info');
-            } else {
-              labels.push('ready-for-review');
-            }
-            
-            // Add labels if they exist
-            try {
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                labels: labels
-              });
-            } catch (error) {
-              console.log('Note: Could not add labels. They may need to be created first.');
-              console.log('Suggested labels: needs-more-info, ready-for-review');
-            }
+          issue-number: ${{ github.event.issue.number }}
+          is-revalidation: ${{ github.event.action != 'opened' }}
