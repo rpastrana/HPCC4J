@@ -31,16 +31,14 @@ body:
   - type: textarea
     id: proposed-solution
     attributes:
-      label: Proposed Solution
-      description: How would you like this feature to work?
+      label: Proposed Solution (optional)
+      description: How would you like this feature to work? (We welcome your ideas, but it's okay if you're not sure about the implementation)
       placeholder: |
         Describe your ideal solution:
         - API changes
         - New methods/classes
         - Configuration options
         - Example usage
-    validations:
-      required: true
 
   - type: dropdown
     id: affected-module
@@ -49,12 +47,12 @@ body:
       description: Which HPCC4J module(s) would this feature affect?
       multiple: true
       options:
-        - wsclient
-        - dfsclient
-        - spark-hpcc
-        - commons-hpcc
-        - clienttools
-        - rdf2hpcc
+        - wsclient - Web service clients for HPCC ESP services
+        - dfsclient - Direct file system access to HPCC distributed files
+        - spark-hpcc - Spark connector for reading/writing HPCC datasets
+        - commons-hpcc - Common utilities shared across modules
+        - clienttools - Java interface to HPCC client tools (eclcc)
+        - rdf2hpcc - RDF data ingestion tool
         - All modules
         - Not sure
     validations:

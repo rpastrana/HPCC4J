@@ -33,12 +33,12 @@ body:
       label: Related Module (if known)
       description: Which HPCC4J module is your question about?
       options:
-        - wsclient
-        - dfsclient
-        - spark-hpcc
-        - commons-hpcc
-        - clienttools
-        - rdf2hpcc
+        - wsclient - Web service clients for HPCC ESP services
+        - dfsclient - Direct file system access to HPCC distributed files
+        - spark-hpcc - Spark connector for reading/writing HPCC datasets
+        - commons-hpcc - Common utilities shared across modules
+        - clienttools - Java interface to HPCC client tools (eclcc)
+        - rdf2hpcc - RDF data ingestion tool
         - General/Multiple modules
         - Not sure
 
@@ -65,6 +65,4 @@ body:
       description: Please confirm before submitting
       options:
         - label: I have checked the [Common Issues and Solutions wiki](https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions)
-          required: true
-        - label: I have searched existing issues and discussions
           required: true
