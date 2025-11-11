@@ -20,6 +20,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Analyze Issue for Duplicates and Workarounds
+        if: github.event.action == 'opened'
+        uses: ./.github/actions/issue-analyzer
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+
       - name: Validate Issue Completeness
         uses: ./.github/actions/issue-validator
         with:

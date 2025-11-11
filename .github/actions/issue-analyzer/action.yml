@@ -1,0 +1,224 @@
+name: 'Issue Analyzer'
+description: 'Uses AI to analyze issues for duplicates and known workarounds from the wiki'
+author: 'HPCC4J Team'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  issue-number:
+    description: 'Issue number to analyze'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Analyze Issue for Duplicates and Workarounds
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          // Get the issue details
+          const { data: issue } = await github.rest.issues.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: parseInt('${{ inputs.issue-number }}')
+          });
+          
+          const issueTitle = issue.title || '';
+          const issueBody = issue.body || '';
+          const issueLabels = issue.labels.map(label => label.name);
+          
+          console.log('🔍 Analyzing issue for duplicates and known workarounds...');
+          console.log(`   Title: ${issueTitle}`);
+          console.log(`   Labels: ${issueLabels.join(', ')}`);
+          
+          // Search for potential duplicate issues
+          const searchQuery = `repo:${context.repo.owner}/${context.repo.repo} is:issue ${issueTitle.substring(0, 100)}`;
+          
+          let duplicates = [];
+          try {
+            const { data: searchResults } = await github.rest.search.issuesAndPullRequests({
+              q: searchQuery,
+              per_page: 5
+            });
+            
+            // Filter out the current issue and only include issues (not PRs)
+            duplicates = searchResults.items
+              .filter(item => item.number !== issue.number && !item.pull_request)
+              .slice(0, 3);
+            
+            console.log(`   Found ${duplicates.length} potential duplicate(s)`);
+          } catch (error) {
+            console.log('   Error searching for duplicates:', error.message);
+          }
+          
+          // Extract key terms for analysis
+          const extractKeyTerms = (text) => {
+            const lowerText = text.toLowerCase();
+            const terms = {
+              hasConnection: lowerText.includes('connection') || lowerText.includes('connect'),
+              hasAuthentication: lowerText.includes('auth') || lowerText.includes('login') || lowerText.includes('credential'),
+              hasTimeout: lowerText.includes('timeout') || lowerText.includes('time out'),
+              hasSpark: lowerText.includes('spark') || lowerText.includes('dataframe'),
+              hasFileAccess: lowerText.includes('file') && (lowerText.includes('read') || lowerText.includes('write') || lowerText.includes('access')),
+              hasSSL: lowerText.includes('ssl') || lowerText.includes('tls') || lowerText.includes('https'),
+              hasSchema: lowerText.includes('schema') || lowerText.includes('record definition'),
+              hasError: lowerText.includes('error') || lowerText.includes('exception') || lowerText.includes('fail'),
+              hasPing: lowerText.includes('ping'),
+              hasWSDL: lowerText.includes('wsdl') || lowerText.includes('web service')
+            };
+            return terms;
+          };
+          
+          const terms = extractKeyTerms(issueTitle + ' ' + issueBody);
+          
+          // Known workarounds mapping from Common Issues wiki
+          const knownWorkarounds = [];
+          
+          if (terms.hasConnection && terms.hasError) {
+            knownWorkarounds.push({
+              title: 'Connection Issues',
+              description: 'Ensure the HPCC cluster is accessible and the ESP service is running on the specified port (default: 8010 for HTTP, 18010 for HTTPS).',
+              suggestions: [
+                'Verify the connection URL format: `http://hostname:port` or `https://hostname:port`',
+                'Check network connectivity: `curl http://your-cluster:8010`',
+                'Ensure no firewall rules are blocking the connection',
+                'Verify credentials if authentication is enabled'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#connection-issues'
+            });
+          }
+          
+          if (terms.hasAuthentication) {
+            knownWorkarounds.push({
+              title: 'Authentication Issues',
+              description: 'Problems with username/password authentication or token-based auth.',
+              suggestions: [
+                'Use `connection.setCredentials(username, password)` for basic auth',
+                'Ensure credentials are correct and the user has appropriate permissions',
+                'Check if the HPCC cluster requires LDAP or other authentication methods'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#authentication'
+            });
+          }
+          
+          if (terms.hasTimeout) {
+            knownWorkarounds.push({
+              title: 'Timeout Issues',
+              description: 'Connection or operation timeouts when accessing HPCC services.',
+              suggestions: [
+                'Increase timeout values in connection configuration',
+                'Check network latency between client and HPCC cluster',
+                'For large file operations, consider using async methods or chunking'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#timeout-issues'
+            });
+          }
+          
+          if (terms.hasSpark) {
+            knownWorkarounds.push({
+              title: 'Spark Integration',
+              description: 'Issues with spark-hpcc connector for reading/writing DataFrames.',
+              suggestions: [
+                'Ensure all required Spark dependencies are included',
+                'Use proper connection options: `host`, `cluster`, `path`',
+                'Check the Spark example notebook for reference implementations',
+                'Verify HPCC file paths use either `::` or `/` separator format'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#spark-connector'
+            });
+          }
+          
+          if (terms.hasSSL) {
+            knownWorkarounds.push({
+              title: 'SSL/TLS Issues',
+              description: 'Certificate or HTTPS connection problems.',
+              suggestions: [
+                'Use HTTPS URLs with port 18010 (default HTTPS ESP port)',
+                'Configure SSL trust store if using self-signed certificates',
+                'Set Java system properties for SSL if needed: `-Djavax.net.ssl.trustStore=...`'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#ssltls'
+            });
+          }
+          
+          if (terms.hasSchema) {
+            knownWorkarounds.push({
+              title: 'Schema/Data Type Issues',
+              description: 'Problems with record definitions or data type mapping.',
+              suggestions: [
+                'Ensure HPCC record definitions match your data structure',
+                'Check data type compatibility between Java and ECL',
+                'Use `FieldDef` objects to describe HPCC data structures',
+                'Be aware of unsigned type handling in Java'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#schema-issues'
+            });
+          }
+          
+          if (terms.hasPing && terms.hasError) {
+            knownWorkarounds.push({
+              title: 'Service Ping Failures',
+              description: 'Ping method failing to connect to HPCC ESP services.',
+              suggestions: [
+                'Verify the ESP service is running: check ECL Watch',
+                'Ensure correct service endpoint (e.g., WsDFU, WsFileSpray)',
+                'Check that the connection URL includes the correct protocol and port',
+                'Test with curl: `curl http://your-cluster:8010/WsSMC/PING`'
+              ],
+              wikiLink: 'https://github.com/hpcc-systems/hpcc4j/wiki/Common-Issues-and-Solutions#ping-failures'
+            });
+          }
+          
+          // Build analysis comment
+          let analysisComment = '## 🤖 AI-Powered Issue Analysis\n\n';
+          
+          // Check if we found anything useful
+          const hasFindings = duplicates.length > 0 || knownWorkarounds.length > 0;
+          
+          if (!hasFindings) {
+            analysisComment += '✨ This appears to be a unique issue with no obvious duplicates or known workarounds found.\n\n';
+            analysisComment += 'The team will review this issue shortly.\n';
+          } else {
+            if (duplicates.length > 0) {
+              analysisComment += '### 🔍 Potential Duplicate Issues\n\n';
+              analysisComment += 'The following similar issues were found. Please check if any of these match your problem:\n\n';
+              
+              for (const dup of duplicates) {
+                const state = dup.state === 'open' ? '🟢 Open' : '🔴 Closed';
+                analysisComment += `- ${state} [#${dup.number}: ${dup.title}](${dup.html_url})\n`;
+              }
+              analysisComment += '\n';
+            }
+            
+            if (knownWorkarounds.length > 0) {
+              analysisComment += '### 💡 Potential Workarounds & Solutions\n\n';
+              analysisComment += 'Based on the issue description, here are some known solutions that might help:\n\n';
+              
+              for (const workaround of knownWorkarounds) {
+                analysisComment += `#### ${workaround.title}\n\n`;
+                analysisComment += `${workaround.description}\n\n`;
+                analysisComment += '**Suggestions:**\n';
+                for (const suggestion of workaround.suggestions) {
+                  analysisComment += `- ${suggestion}\n`;
+                }
+                analysisComment += `\n📖 [View full documentation](${workaround.wikiLink})\n\n`;
+              }
+            }
+          }
+          
+          analysisComment += '---\n\n';
+          analysisComment += '*This analysis was performed automatically using AI. If none of these suggestions help, the team will investigate further.*\n';
+          
+          // Post the analysis comment
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: issue.number,
+            body: analysisComment
+          });
+          
+          console.log('✅ Posted AI analysis comment');
+          console.log(`   Duplicates found: ${duplicates.length}`);
+          console.log(`   Workarounds suggested: ${knownWorkarounds.length}`);
