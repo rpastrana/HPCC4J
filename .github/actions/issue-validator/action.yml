@@ -145,13 +145,38 @@ runs:
             analysisComment += footerText;
           }
           
-          // Post the analysis as a comment
-          await github.rest.issues.createComment({
+          // Find existing validation comment to update instead of creating a new one
+          const comments = await github.rest.issues.listComments({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            issue_number: issue.number,
-            body: analysisComment
+            issue_number: issue.number
           });
+          
+          // Look for an existing validation comment from this bot
+          const botComment = comments.data.find(comment => 
+            comment.user.type === 'Bot' && 
+            (comment.body.includes('Issue Validation Analysis') || comment.body.includes('Issue Re-validation Analysis'))
+          );
+          
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: analysisComment
+            });
+            console.log('✅ Updated existing validation comment');
+          } else {
+            // Create new comment if none exists
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: analysisComment
+            });
+            console.log('✅ Created new validation comment');
+          }
           
           // Manage labels based on completeness
           const hasNeedsMoreInfo = issue.labels.some(label => label.name === 'needs-more-info');
