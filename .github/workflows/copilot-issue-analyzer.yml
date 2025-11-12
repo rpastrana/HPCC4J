@@ -86,22 +86,25 @@ jobs:
       - name: Analyze issue with GitHub Copilot
         id: analyze
         run: |
-          # Load the reusable prompt template
-          PROMPT_TEMPLATE=$(cat .github/copilot-issue-analysis-prompt.md)
-          
-          # Replace placeholders with actual issue data
+          # Get issue data
           TITLE="${{ steps.issue.outputs.title }}"
           BODY="${{ steps.issue.outputs.body }}"
           
-          ANALYSIS_PROMPT="${PROMPT_TEMPLATE//\{ISSUE_TITLE\}/$TITLE}"
-          ANALYSIS_PROMPT="${ANALYSIS_PROMPT//\{ISSUE_BODY\}/$BODY}"
-          
-          # Save the filled prompt
-          echo "$ANALYSIS_PROMPT" > analysis_prompt.txt
+          # Write to temp files to avoid bash quoting issues
+          printf '%s' "$TITLE" > /tmp/issue_title.txt
+          printf '%s' "$BODY" > /tmp/issue_body.txt
 
           # Use GitHub Copilot API if access is available
           if [ "${{ steps.copilot_check.outputs.has_copilot }}" = "true" ]; then
             echo "🤖 Analyzing issue with GitHub Copilot..."
+            
+            # Load the reusable prompt template
+            PROMPT_TEMPLATE=$(cat .github/copilot-issue-analysis-prompt.md)
+            
+            # Replace placeholders with actual issue data using sed
+            echo "$PROMPT_TEMPLATE" | \
+              sed "s/{ISSUE_TITLE}/$(cat /tmp/issue_title.txt | sed 's/[\/&]/\\&/g')/g" | \
+              sed "s/{ISSUE_BODY}/$(cat /tmp/issue_body.txt | sed 's/[\/&]/\\&/g')/g" > analysis_prompt.txt
             
             # Create a conversation with Copilot using the Chat API
             API_RESPONSE=$(gh api \
@@ -127,9 +130,7 @@ jobs:
                 echo "   Error: $ERROR_MSG"
               fi
               echo "   Falling back to rule-based analysis..."
-              # Write issue data to temporary files to avoid shell quoting issues
-              echo "$TITLE" > /tmp/issue_title.txt
-              echo "$BODY" > /tmp/issue_body.txt
+              # Use temp files written earlier
               ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
               PYTHON_EXIT=$?
               if [ $PYTHON_EXIT -ne 0 ]; then
@@ -140,9 +141,7 @@ jobs:
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
-            # Write issue data to temporary files to avoid shell quoting issues
-            echo "$TITLE" > /tmp/issue_title.txt
-            echo "$BODY" > /tmp/issue_body.txt
+            # Use temp files written earlier
             ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
             PYTHON_EXIT=$?
             if [ $PYTHON_EXIT -ne 0 ]; then
