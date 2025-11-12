@@ -159,19 +159,25 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Comment analysis on issue
+        env:
+          ANALYSIS_OUTPUT: ${{ steps.analyze.outputs.analysis }}
+          ISSUE_NUMBER: ${{ steps.issue_num.outputs.number }}
         run: |
           # Only post comment if analysis was generated successfully
-          if [ -n "${{ steps.analyze.outputs.analysis }}" ]; then
+          if [ -n "$ANALYSIS_OUTPUT" ]; then
             cat > comment.md <<'COMMENT'
-          ## 🤖 GitHub Copilot Issue Analysis
+## 🤖 GitHub Copilot Issue Analysis
 
-          ${{ steps.analyze.outputs.analysis }}
+COMMENT
+            # Append the analysis output
+            echo "$ANALYSIS_OUTPUT" >> comment.md
+            cat >> comment.md <<'COMMENT'
 
-          ---
-          *This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*
-          COMMENT
+---
+*This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*
+COMMENT
 
-            gh issue comment ${{ steps.issue_num.outputs.number }} --body-file comment.md
+            gh issue comment "$ISSUE_NUMBER" --body-file comment.md
             echo "✓ Analysis comment posted successfully"
           else
             echo "⚠️  No analysis output to post"
