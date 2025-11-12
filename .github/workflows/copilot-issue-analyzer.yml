@@ -127,13 +127,11 @@ jobs:
                 echo "   Error: $ERROR_MSG"
               fi
               echo "   Falling back to rule-based analysis..."
-              chmod +x .github/scripts/analyze_issue.py
-              ANALYSIS=$(.github/scripts/analyze_issue.py "$TITLE" "$BODY")
+              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY")
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
-            chmod +x .github/scripts/analyze_issue.py
-            ANALYSIS=$(.github/scripts/analyze_issue.py "$TITLE" "$BODY")
+            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY")
           fi
           
           # Ensure ANALYSIS is not empty
