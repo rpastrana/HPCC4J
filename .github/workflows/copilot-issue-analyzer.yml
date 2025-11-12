@@ -21,6 +21,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
       - name: Install GitHub CLI
         run: |
           type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
@@ -30,12 +35,32 @@ jobs:
           sudo apt update
           sudo apt install gh -y
 
-      - name: Install GitHub Copilot CLI
+      - name: Setup GitHub CLI with Copilot access
         run: |
-          # Install the new standalone Copilot CLI
-          npm install -g @githubnext/github-copilot-cli
-          # Authenticate with GitHub
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          # Use PAT with Copilot access
+          if [ -n "${{ secrets.COPILOT_PAT }}" ]; then
+            echo "${{ secrets.COPILOT_PAT }}" | gh auth login --with-token
+            echo "✓ Using Copilot PAT for authentication"
+          else
+            echo "❌ COPILOT_PAT not found - Copilot features will not be available"
+            echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          fi
+
+      - name: Verify Copilot access
+        id: copilot_check
+        run: |
+          # Check if user has Copilot access via API
+          COPILOT_STATUS=$(gh api /user/copilot_seat_details 2>&1 || echo "NO_ACCESS")
+          if echo "$COPILOT_STATUS" | grep -q "seat"; then
+            echo "has_copilot=true" >> $GITHUB_OUTPUT
+            echo "✓ GitHub Copilot access confirmed"
+          else
+            echo "has_copilot=false" >> $GITHUB_OUTPUT
+            echo "⚠️  No GitHub Copilot access detected"
+            echo "   Make sure the account associated with COPILOT_PAT has an active Copilot subscription"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Get issue number
         id: issue_num
@@ -58,62 +83,97 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Analyze issue with Copilot CLI
+      - name: Analyze issue with GitHub Copilot
         id: analyze
         run: |
-          # Create analysis prompt
-          cat > analysis_prompt.txt <<'PROMPT'
-          Analyze the following GitHub issue and determine if it contains sufficient information for a developer to understand and address it.
+          # Load the reusable prompt template
+          PROMPT_TEMPLATE=$(cat .github/copilot-issue-analysis-prompt.md)
+          
+          # Replace placeholders with actual issue data
+          TITLE="${{ steps.issue.outputs.title }}"
+          BODY="${{ steps.issue.outputs.body }}"
+          
+          ANALYSIS_PROMPT="${PROMPT_TEMPLATE//\{ISSUE_TITLE\}/$TITLE}"
+          ANALYSIS_PROMPT="${ANALYSIS_PROMPT//\{ISSUE_BODY\}/$BODY}"
+          
+          # Save the filled prompt
+          echo "$ANALYSIS_PROMPT" > analysis_prompt.txt
 
-          Issue Title: ${{ steps.issue.outputs.title }}
-
-          Issue Body:
-          ${{ steps.issue.outputs.body }}
-
-          Please evaluate:
-          1. Is the issue description clear and specific?
-          2. Are there steps to reproduce (if it's a bug)?
-          3. Is the expected behavior described?
-          4. Is the actual behavior described?
-          5. Are there any error messages, logs, or stack traces included?
-          6. Is version information provided (Java version, HPCC version, library version)?
-          7. Is cluster connection information provided (endpoint, authentication details)?
-          8. For HPCC4J specifically, which module does this relate to (wsclient, dfsclient, spark-hpcc, etc.)?
-
-          Provide a summary with:
-          - Overall assessment (SUFFICIENT or NEEDS_MORE_INFO)
-          - List of missing information (if any)
-          - Suggested questions to ask the reporter
-          PROMPT
-
-          # Use the new Copilot CLI to analyze
-          ANALYSIS=$(github-copilot-cli what-the-shell "$(cat analysis_prompt.txt)" 2>&1 || echo "Analysis failed")
+          # Use GitHub Copilot API if access is available
+          if [ "${{ steps.copilot_check.outputs.has_copilot }}" = "true" ]; then
+            echo "🤖 Analyzing issue with GitHub Copilot..."
+            
+            # Create a conversation with Copilot using the Chat API
+            API_RESPONSE=$(gh api \
+              -X POST \
+              /chat/completions \
+              -H "Accept: application/vnd.github+json" \
+              -f model="gpt-4" \
+              -f messages[]='{"role":"system","content":"You are an expert at analyzing GitHub issues for the HPCC4J project."}' \
+              -f messages[]='{"role":"user","content":"'"$(cat analysis_prompt.txt)"'"}' \
+              2>&1)
+            
+            API_EXIT_CODE=$?
+            
+            # Check if API call was successful
+            if [ $API_EXIT_CODE -eq 0 ] && echo "$API_RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+              ANALYSIS=$(echo "$API_RESPONSE" | jq -r '.choices[0].message.content')
+              echo "✓ Copilot analysis completed successfully"
+            else
+              # Log the error for debugging but don't include in output
+              echo "⚠️  Copilot API call failed (exit code: $API_EXIT_CODE)"
+              if echo "$API_RESPONSE" | jq -e '.message' > /dev/null 2>&1; then
+                ERROR_MSG=$(echo "$API_RESPONSE" | jq -r '.message')
+                echo "   Error: $ERROR_MSG"
+              fi
+              echo "   Falling back to rule-based analysis..."
+              chmod +x .github/scripts/analyze_issue.py
+              ANALYSIS=$(.github/scripts/analyze_issue.py "$TITLE" "$BODY")
+            fi
+          else
+            echo "📋 Using rule-based analysis (Copilot not available)..."
+            chmod +x .github/scripts/analyze_issue.py
+            ANALYSIS=$(.github/scripts/analyze_issue.py "$TITLE" "$BODY")
+          fi
+          
+          # Ensure ANALYSIS is not empty
+          if [ -z "$ANALYSIS" ]; then
+            echo "⚠️  Analysis output was empty, generating basic response..."
+            ANALYSIS="## Analysis Error\n\nUnable to analyze issue automatically. Please review manually."
+          fi
           
           echo "analysis<<EOF" >> $GITHUB_OUTPUT
           echo "$ANALYSIS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Comment analysis on issue
         run: |
-          cat > comment.md <<'COMMENT'
-          ## 🤖 Copilot Issue Analysis
+          # Only post comment if analysis was generated successfully
+          if [ -n "${{ steps.analyze.outputs.analysis }}" ]; then
+            cat > comment.md <<'COMMENT'
+          ## 🤖 GitHub Copilot Issue Analysis
 
           ${{ steps.analyze.outputs.analysis }}
 
           ---
-          *This analysis was automatically generated by GitHub Copilot CLI to help ensure issues contain sufficient information for investigation.*
+          *This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*
           COMMENT
 
-          gh issue comment ${{ steps.issue_num.outputs.number }} --body-file comment.md
+            gh issue comment ${{ steps.issue_num.outputs.number }} --body-file comment.md
+            echo "✓ Analysis comment posted successfully"
+          else
+            echo "⚠️  No analysis output to post"
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add label if more info needed
-        if: contains(steps.analyze.outputs.analysis, 'NEEDS_MORE_INFO')
+        if: contains(steps.analyze.outputs.analysis, 'NEEDS_MORE_INFO') && !contains(github.event.issue.labels.*.name, 'needs-more-info')
         run: |
           gh issue edit ${{ steps.issue_num.outputs.number }} --add-label "needs-more-info"
+          echo "✓ Added 'needs-more-info' label"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
