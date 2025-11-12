@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
@@ -88,6 +88,7 @@ jobs:
         env:
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           ISSUE_BODY: ${{ steps.issue.outputs.body }}
+          GH_TOKEN: ${{ secrets.COPILOT_PAT }}
         run: |
           # Write issue data to temp files (using env vars to avoid bash interpolation issues)
           printf '%s' "$ISSUE_TITLE" > /tmp/issue_title.txt
@@ -156,8 +157,6 @@ jobs:
           echo "analysis<<EOF" >> $GITHUB_OUTPUT
           echo "$ANALYSIS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ secrets.COPILOT_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Comment analysis on issue
         run: |
