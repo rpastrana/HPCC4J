@@ -127,11 +127,23 @@ jobs:
                 echo "   Error: $ERROR_MSG"
               fi
               echo "   Falling back to rule-based analysis..."
-              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY")
+              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY" 2>&1)
+              PYTHON_EXIT=$?
+              if [ $PYTHON_EXIT -ne 0 ]; then
+                echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
+                echo "Output: $ANALYSIS"
+                ANALYSIS="## Analysis Error\n\nPython script execution failed. Please review manually."
+              fi
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
-            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY")
+            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY" 2>&1)
+            PYTHON_EXIT=$?
+            if [ $PYTHON_EXIT -ne 0 ]; then
+              echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
+              echo "Output: $ANALYSIS"
+              ANALYSIS="## Analysis Error\n\nPython script execution failed. Please review manually."
+            fi
           fi
           
           # Ensure ANALYSIS is not empty
