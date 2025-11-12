@@ -98,21 +98,10 @@ jobs:
             echo "🤖 Analyzing issue with GitHub Copilot..."
             
             # Build the analysis prompt by combining template with issue data
-            # Read the template
-            PROMPT_TEMPLATE=$(cat .github/copilot-issue-analysis-prompt.md)
-            
-            # Create the complete prompt using Python to safely handle multiline content
-            FULL_PROMPT=$(python3 -c "
-import sys
-template = '''$PROMPT_TEMPLATE'''
-title = open('/tmp/issue_title.txt', 'r').read()
-body = open('/tmp/issue_body.txt', 'r').read()
-prompt = template.replace('{ISSUE_TITLE}', title).replace('{ISSUE_BODY}', body)
-print(prompt)
-")
-            
-            # Save to file for API call
-            printf '%s' "$FULL_PROMPT" > /tmp/analysis_prompt.txt
+            python3 .github/scripts/build_prompt.py \
+              .github/copilot-issue-analysis-prompt.md \
+              /tmp/issue_title.txt \
+              /tmp/issue_body.txt > /tmp/analysis_prompt.txt
             
             # Call Copilot Chat API
             API_RESPONSE=$(gh api \
