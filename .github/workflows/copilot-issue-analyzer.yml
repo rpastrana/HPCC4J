@@ -85,14 +85,13 @@ jobs:
 
       - name: Analyze issue with GitHub Copilot
         id: analyze
+        env:
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+          ISSUE_BODY: ${{ steps.issue.outputs.body }}
         run: |
-          # Get issue data
-          TITLE="${{ steps.issue.outputs.title }}"
-          BODY="${{ steps.issue.outputs.body }}"
-          
-          # Write to temp files to avoid bash quoting issues
-          printf '%s' "$TITLE" > /tmp/issue_title.txt
-          printf '%s' "$BODY" > /tmp/issue_body.txt
+          # Write issue data to temp files (using env vars to avoid bash interpolation issues)
+          printf '%s' "$ISSUE_TITLE" > /tmp/issue_title.txt
+          printf '%s' "$ISSUE_BODY" > /tmp/issue_body.txt
 
           # Use GitHub Copilot API if access is available
           if [ "${{ steps.copilot_check.outputs.has_copilot }}" = "true" ]; then
