@@ -31,16 +31,24 @@ jobs:
         env:
           COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
-          # Debug: Check if COPILOT_PAT is set
+          # GitHub Copilot Chat API (api.githubcopilot.com) does NOT support Personal Access Tokens
+          # Authentication requirements:
+          #   - OAuth tokens from Copilot IDE extensions (not obtainable in workflows)
+          #   - GitHub App installation tokens with Copilot permissions (complex setup)
+          #   - VS Code extension tokens (session-based, not portable)
+          # 
+          # PATs (both classic and fine-grained) return: "bad request: Personal Access Tokens are not supported for this endpoint"
+          # 
+          # To integrate Copilot in the future:
+          #   1. Create a GitHub App with Copilot permissions
+          #   2. Install the app on this repository
+          #   3. Generate installation tokens in the workflow
+          #   4. Use those tokens for api.githubcopilot.com calls
+          
           if [ -z "$COPILOT_PAT" ]; then
-            echo "🔍 DEBUG: COPILOT_PAT is EMPTY or NOT SET"
             echo "has_copilot=false" >> $GITHUB_OUTPUT
             echo "⚠️  COPILOT_PAT not configured - will use rule-based analysis"
             exit 0
-          else
-            TOKEN_LENGTH=${#COPILOT_PAT}
-            echo "🔍 DEBUG: COPILOT_PAT is SET (length: $TOKEN_LENGTH characters)"
-            echo "🔍 DEBUG: Token prefix: ${COPILOT_PAT:0:7}..."
           fi
           
           # Install minimal tools for API check
@@ -78,12 +86,6 @@ jobs:
             echo "   Response body:"
             cat /tmp/copilot_check.json 2>/dev/null | jq '.' || cat /tmp/copilot_check.json
             echo ""
-            echo "   TROUBLESHOOTING:"
-            echo "   1. GitHub Copilot Chat API does NOT support fine-grained PATs"
-            echo "   2. You must use a CLASSIC Personal Access Token"
-            echo "   3. Create at: https://github.com/settings/tokens (not /tokens/new for fine-grained)"
-            echo "   4. Required scopes: 'user' (and 'copilot' if available)"
-            echo "   5. Account must have active GitHub Copilot subscription"
             echo "   Will use rule-based analysis instead"
           fi
 
@@ -99,20 +101,10 @@ jobs:
 
       - name: Setup GitHub CLI authentication
         env:
-          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Use COPILOT_PAT if available, otherwise fallback to GITHUB_TOKEN
-          if [ -n "$COPILOT_PAT" ]; then
-            echo "$COPILOT_PAT" | gh auth login --with-token
-            echo "✓ Authenticated with COPILOT_PAT"
-            TOKEN_LENGTH=${#COPILOT_PAT}
-            echo "🔍 DEBUG: Token length: $TOKEN_LENGTH characters"
-            echo "🔍 DEBUG: Token prefix: ${COPILOT_PAT:0:7}..."
-          else
-            echo "$GH_TOKEN" | gh auth login --with-token
-            echo "⚠️  Using GITHUB_TOKEN (Copilot features may not be available)"
-          fi
+          echo "$GH_TOKEN" | gh auth login --with-token
+          echo "✓ Authenticated with GITHUB_TOKEN"
 
       - name: Get issue number
         id: issue_num
@@ -135,12 +127,12 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
           echo "$ISSUE_DATA" | jq -r '.labels[].name // empty' > labels.txt 2>/dev/null || touch labels.txt
 
-      - name: Analyze issue with GitHub Copilot
+      - name: Analyze issue with GitHub Copilot Chat
         id: analyze
         env:
           ISSUE_TITLE: ${{ steps.issue.outputs.title }}
           ISSUE_BODY: ${{ steps.issue.outputs.body }}
-          GH_TOKEN: ${{ secrets.COPILOT_PAT }}
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
           # Write issue data to temp files (using env vars to avoid bash interpolation issues)
           printf '%s' "$ISSUE_TITLE" > /tmp/issue_title.txt
@@ -158,7 +150,7 @@ jobs:
             
             # Call GitHub Copilot Chat API
             API_RESPONSE=$(curl -s -X POST \
-              -H "Authorization: Bearer ${{ secrets.COPILOT_PAT }}" \
+              -H "Authorization: Bearer $COPILOT_PAT" \
               -H "Accept: application/json" \
               -H "Content-Type: application/json" \
               "https://api.githubcopilot.com/chat/completions" \
@@ -190,7 +182,6 @@ jobs:
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
-            # Use temp files written earlier
             ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
             PYTHON_EXIT=$?
             if [ $PYTHON_EXIT -ne 0 ]; then
