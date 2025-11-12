@@ -127,7 +127,10 @@ jobs:
                 echo "   Error: $ERROR_MSG"
               fi
               echo "   Falling back to rule-based analysis..."
-              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY" 2>&1)
+              # Write issue data to temporary files to avoid shell quoting issues
+              echo "$TITLE" > /tmp/issue_title.txt
+              echo "$BODY" > /tmp/issue_body.txt
+              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
               PYTHON_EXIT=$?
               if [ $PYTHON_EXIT -ne 0 ]; then
                 echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
@@ -137,15 +140,11 @@ jobs:
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
-            echo "  DEBUG: About to run Python script..."
-            echo "  DEBUG: which python3 = $(which python3)"
-            echo "  DEBUG: python3 --version = $(python3 --version 2>&1)"
-            echo "  DEBUG: TITLE = $TITLE"
-            echo "  DEBUG: BODY length = ${#BODY}"
-            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$TITLE" "$BODY" 2>&1)
+            # Write issue data to temporary files to avoid shell quoting issues
+            echo "$TITLE" > /tmp/issue_title.txt
+            echo "$BODY" > /tmp/issue_body.txt
+            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
             PYTHON_EXIT=$?
-            echo "  DEBUG: Python exit code = $PYTHON_EXIT"
-            echo "  DEBUG: Analysis length = ${#ANALYSIS}"
             if [ $PYTHON_EXIT -ne 0 ]; then
               echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
               echo "Output: $ANALYSIS"
