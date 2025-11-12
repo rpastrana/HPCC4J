@@ -97,46 +97,15 @@ jobs:
           if [ "${{ steps.copilot_check.outputs.has_copilot }}" = "true" ]; then
             echo "🤖 Analyzing issue with GitHub Copilot..."
             
-            # Load the reusable prompt template
-            PROMPT_TEMPLATE=$(cat .github/copilot-issue-analysis-prompt.md)
-            
-            # Replace placeholders with actual issue data using sed
-            echo "$PROMPT_TEMPLATE" | \
-              sed "s/{ISSUE_TITLE}/$(cat /tmp/issue_title.txt | sed 's/[\/&]/\\&/g')/g" | \
-              sed "s/{ISSUE_BODY}/$(cat /tmp/issue_body.txt | sed 's/[\/&]/\\&/g')/g" > analysis_prompt.txt
-            
-            # Create a conversation with Copilot using the Chat API
-            API_RESPONSE=$(gh api \
-              -X POST \
-              /chat/completions \
-              -H "Accept: application/vnd.github+json" \
-              -f model="gpt-4" \
-              -f messages[]='{"role":"system","content":"You are an expert at analyzing GitHub issues for the HPCC4J project."}' \
-              -f messages[]='{"role":"user","content":"'"$(cat analysis_prompt.txt)"'"}' \
-              2>&1)
-            
-            API_EXIT_CODE=$?
-            
-            # Check if API call was successful
-            if [ $API_EXIT_CODE -eq 0 ] && echo "$API_RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
-              ANALYSIS=$(echo "$API_RESPONSE" | jq -r '.choices[0].message.content')
-              echo "✓ Copilot analysis completed successfully"
-            else
-              # Log the error for debugging but don't include in output
-              echo "⚠️  Copilot API call failed (exit code: $API_EXIT_CODE)"
-              if echo "$API_RESPONSE" | jq -e '.message' > /dev/null 2>&1; then
-                ERROR_MSG=$(echo "$API_RESPONSE" | jq -r '.message')
-                echo "   Error: $ERROR_MSG"
-              fi
-              echo "   Falling back to rule-based analysis..."
-              # Use temp files written earlier
-              ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
-              PYTHON_EXIT=$?
-              if [ $PYTHON_EXIT -ne 0 ]; then
-                echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
-                echo "Output: $ANALYSIS"
-                ANALYSIS="## Analysis Error\n\nPython script execution failed. Please review manually."
-              fi
+            # TODO: Implement Copilot API integration
+            echo "⚠️  Copilot API integration not yet implemented"
+            echo "   Falling back to rule-based analysis..."
+            ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
+            PYTHON_EXIT=$?
+            if [ $PYTHON_EXIT -ne 0 ]; then
+              echo "⚠️  Python script failed with exit code: $PYTHON_EXIT"
+              echo "Output: $ANALYSIS"
+              ANALYSIS="## Analysis Error\n\nPython script execution failed. Please review manually."
             fi
           else
             echo "📋 Using rule-based analysis (Copilot not available)..."
