@@ -30,11 +30,12 @@ jobs:
           sudo apt update
           sudo apt install gh -y
 
-      - name: Install GitHub Copilot CLI extension
+      - name: Install GitHub Copilot CLI
         run: |
-          gh extension install github/gh-copilot
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Install the new standalone Copilot CLI
+          npm install -g @githubnext/github-copilot-cli
+          # Authenticate with GitHub
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
       - name: Get issue number
         id: issue_num
@@ -85,14 +86,15 @@ jobs:
           - Suggested questions to ask the reporter
           PROMPT
 
-          # Use Copilot CLI to analyze
-          ANALYSIS=$(gh copilot explain "$(cat analysis_prompt.txt)" 2>&1 || echo "Analysis failed")
+          # Use the new Copilot CLI to analyze
+          ANALYSIS=$(github-copilot-cli what-the-shell "$(cat analysis_prompt.txt)" 2>&1 || echo "Analysis failed")
           
           echo "analysis<<EOF" >> $GITHUB_OUTPUT
           echo "$ANALYSIS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Comment analysis on issue
         run: |
