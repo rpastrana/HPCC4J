@@ -1,4 +1,4 @@
-name: Analyze Issue with Copilot CLI
+name: Analyze Issue with GitHub Copilot Chat
 
 on:
   issues:
@@ -26,41 +26,43 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install GitHub CLI
-        run: |
-          type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update
-          sudo apt install gh -y
-
-      - name: Setup GitHub CLI with Copilot access
-        run: |
-          # Use PAT with Copilot access
-          if [ -n "${{ secrets.COPILOT_PAT }}" ]; then
-            echo "${{ secrets.COPILOT_PAT }}" | gh auth login --with-token
-            echo "✓ Using Copilot PAT for authentication"
-          else
-            echo "❌ COPILOT_PAT not found - Copilot features will not be available"
-            echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          fi
-
-      - name: Verify Copilot access
+      - name: Check Copilot access availability
         id: copilot_check
         run: |
-          # Check if user has Copilot access via API
-          COPILOT_STATUS=$(gh api /user/copilot_seat_details 2>&1 || echo "NO_ACCESS")
-          if echo "$COPILOT_STATUS" | grep -q "seat"; then
+          if [ -z "${{ secrets.COPILOT_PAT }}" ]; then
+            echo "has_copilot=false" >> $GITHUB_OUTPUT
+            echo "⚠️  COPILOT_PAT not configured - will use rule-based analysis"
+            exit 0
+          fi
+          
+          # Install minimal tools for API check
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl jq > /dev/null 2>&1
+          
+          # Check GitHub Copilot Chat API access
+          HTTP_CODE=$(curl -s -o /tmp/copilot_check.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.COPILOT_PAT }}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            "https://api.githubcopilot.com/chat/completions" \
+            -d '{"messages":[{"role":"user","content":"test"}],"model":"gpt-4o","stream":false,"max_tokens":5}')
+          
+          if [ "$HTTP_CODE" = "200" ]; then
             echo "has_copilot=true" >> $GITHUB_OUTPUT
-            echo "✓ GitHub Copilot access confirmed"
+            echo "✓ GitHub Copilot Chat API access confirmed"
           else
             echo "has_copilot=false" >> $GITHUB_OUTPUT
-            echo "⚠️  No GitHub Copilot access detected"
-            echo "   Make sure the account associated with COPILOT_PAT has an active Copilot subscription"
+            echo "⚠️  No GitHub Copilot Chat API access detected (HTTP $HTTP_CODE)"
+            cat /tmp/copilot_check.json 2>/dev/null || true
+            echo "   Will use rule-based analysis instead"
           fi
-        env:
-          GH_TOKEN: ${{ secrets.COPILOT_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Install GitHub CLI
+        if: steps.copilot_check.outputs.has_copilot == 'true'
+        run: |
+          # Only need curl and jq for API calls, no gh CLI needed
+          echo "✓ Using direct API calls (curl already installed)"
 
       - name: Get issue number
         id: issue_num
@@ -74,12 +76,20 @@ jobs:
       - name: Fetch issue details
         id: issue
         run: |
-          ISSUE_DATA=$(gh issue view ${{ steps.issue_num.outputs.number }} --json title,body,labels)
+          # Use curl if gh CLI not installed (when Copilot not available)
+          if command -v gh &> /dev/null; then
+            ISSUE_DATA=$(gh issue view ${{ steps.issue_num.outputs.number }} --json title,body,labels)
+          else
+            ISSUE_DATA=$(curl -s \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.issue_num.outputs.number }}")
+          fi
           echo "title=$(echo "$ISSUE_DATA" | jq -r '.title')" >> $GITHUB_OUTPUT
           echo "body<<EOF" >> $GITHUB_OUTPUT
           echo "$ISSUE_DATA" | jq -r '.body // ""' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo "$ISSUE_DATA" | jq -r '.labels[].name' > labels.txt
+          echo "$ISSUE_DATA" | jq -r '.labels[].name // empty' > labels.txt 2>/dev/null || touch labels.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -94,9 +104,9 @@ jobs:
           printf '%s' "$ISSUE_TITLE" > /tmp/issue_title.txt
           printf '%s' "$ISSUE_BODY" > /tmp/issue_body.txt
 
-          # Use GitHub Copilot API if access is available
+          # Use GitHub Copilot Chat API if access is available
           if [ "${{ steps.copilot_check.outputs.has_copilot }}" = "true" ]; then
-            echo "🤖 Analyzing issue with GitHub Copilot..."
+            echo "🤖 Analyzing issue with GitHub Copilot Chat..."
             
             # Build the analysis prompt by combining template with issue data
             python3 .github/scripts/build_prompt.py \
@@ -104,29 +114,29 @@ jobs:
               /tmp/issue_title.txt \
               /tmp/issue_body.txt > /tmp/analysis_prompt.txt
             
-            # Call Copilot Chat API
-            API_RESPONSE=$(gh api \
-              -X POST \
-              /chat/completions \
-              -H "Accept: application/vnd.github+json" \
-              -f model="gpt-4" \
-              -f messages[]='{"role":"system","content":"You are an expert at analyzing GitHub issues for the HPCC4J project."}' \
-              -f messages[]='{"role":"user","content":"'"$(cat /tmp/analysis_prompt.txt)"'"}' \
-              2>&1)
-            
-            API_EXIT_CODE=$?
+            # Call GitHub Copilot Chat API
+            API_RESPONSE=$(curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.COPILOT_PAT }}" \
+              -H "Accept: application/json" \
+              -H "Content-Type: application/json" \
+              "https://api.githubcopilot.com/chat/completions" \
+              -d "{
+                \"messages\": [
+                  {\"role\": \"system\", \"content\": \"You are an expert at analyzing GitHub issues for the HPCC4J project.\"},
+                  {\"role\": \"user\", \"content\": $(jq -Rs . < /tmp/analysis_prompt.txt)}
+                ],
+                \"model\": \"gpt-4o\",
+                \"stream\": false
+              }")
             
             # Check if API call was successful
-            if [ $API_EXIT_CODE -eq 0 ] && echo "$API_RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
+            if echo "$API_RESPONSE" | jq -e '.choices[0].message.content' > /dev/null 2>&1; then
               ANALYSIS=$(echo "$API_RESPONSE" | jq -r '.choices[0].message.content')
-              echo "✓ Copilot analysis completed successfully"
+              echo "✓ Copilot Chat analysis completed successfully"
             else
-              # Log the error for debugging but don't include in output
-              echo "⚠️  Copilot API call failed (exit code: $API_EXIT_CODE)"
-              if echo "$API_RESPONSE" | jq -e '.message' > /dev/null 2>&1; then
-                ERROR_MSG=$(echo "$API_RESPONSE" | jq -r '.message')
-                echo "   Error: $ERROR_MSG"
-              fi
+              # Log the error for debugging
+              echo "⚠️  Copilot Chat API call failed"
+              echo "Response: $API_RESPONSE"
               echo "   Falling back to rule-based analysis..."
               ANALYSIS=$(python3 .github/scripts/analyze_issue.py "$(cat /tmp/issue_title.txt)" "$(cat /tmp/issue_body.txt)" 2>&1)
               PYTHON_EXIT=$?
@@ -176,7 +186,16 @@ jobs:
             echo "---" >> comment.md
             echo "*This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*" >> comment.md
 
-            gh issue comment "$ISSUE_NUMBER" --body-file comment.md
+            # Use gh CLI if available, otherwise use curl
+            if command -v gh &> /dev/null; then
+              gh issue comment "$ISSUE_NUMBER" --body-file comment.md
+            else
+              curl -s -X POST \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments" \
+                -d "{\"body\":$(jq -Rs . < comment.md)}" > /dev/null
+            fi
             echo "✓ Analysis comment posted successfully"
           else
             echo "⚠️  No analysis output to post"
@@ -186,7 +205,16 @@ jobs:
       - name: Add label if more info needed
         if: contains(steps.analyze.outputs.analysis, 'NEEDS_MORE_INFO') && !contains(github.event.issue.labels.*.name, 'needs-more-info')
         run: |
-          gh issue edit ${{ steps.issue_num.outputs.number }} --add-label "needs-more-info"
+          # Use gh CLI if available, otherwise use curl
+          if command -v gh &> /dev/null; then
+            gh issue edit ${{ steps.issue_num.outputs.number }} --add-label "needs-more-info"
+          else
+            curl -s -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/issues/${{ steps.issue_num.outputs.number }}/labels" \
+              -d '{"labels":["needs-more-info"]}' > /dev/null
+          fi
           echo "✓ Added 'needs-more-info' label"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
