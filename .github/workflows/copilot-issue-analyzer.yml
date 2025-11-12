@@ -125,6 +125,8 @@ jobs:
 
       - name: Fetch issue details
         id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ISSUE_DATA=$(gh issue view ${{ steps.issue_num.outputs.number }} --json title,body,labels)
           echo "title=$(echo "$ISSUE_DATA" | jq -r '.title')" >> $GITHUB_OUTPUT
@@ -244,6 +246,8 @@ jobs:
 
       - name: Add label if more info needed
         if: contains(steps.analyze.outputs.analysis, 'NEEDS_MORE_INFO') && !contains(github.event.issue.labels.*.name, 'needs-more-info')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue edit ${{ steps.issue_num.outputs.number }} --add-label "needs-more-info"
           echo "✓ Added 'needs-more-info' label"
