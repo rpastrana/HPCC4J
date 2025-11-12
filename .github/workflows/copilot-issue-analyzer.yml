@@ -28,33 +28,62 @@ jobs:
 
       - name: Check Copilot access availability
         id: copilot_check
+        env:
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
         run: |
-          if [ -z "${{ secrets.COPILOT_PAT }}" ]; then
+          # Debug: Check if COPILOT_PAT is set
+          if [ -z "$COPILOT_PAT" ]; then
+            echo "🔍 DEBUG: COPILOT_PAT is EMPTY or NOT SET"
             echo "has_copilot=false" >> $GITHUB_OUTPUT
             echo "⚠️  COPILOT_PAT not configured - will use rule-based analysis"
             exit 0
+          else
+            TOKEN_LENGTH=${#COPILOT_PAT}
+            echo "🔍 DEBUG: COPILOT_PAT is SET (length: $TOKEN_LENGTH characters)"
+            echo "🔍 DEBUG: Token prefix: ${COPILOT_PAT:0:7}..."
           fi
           
           # Install minimal tools for API check
           sudo apt-get update -qq
           sudo apt-get install -y -qq curl jq > /dev/null 2>&1
           
+          # Check what account the PAT belongs to
+          echo "🔍 Checking GitHub account for PAT..."
+          USER_INFO=$(curl -s \
+            -H "Authorization: Bearer $COPILOT_PAT" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/user")
+          
+          USERNAME=$(echo "$USER_INFO" | jq -r '.login // "unknown"')
+          USER_TYPE=$(echo "$USER_INFO" | jq -r '.type // "unknown"')
+          echo "   Account: $USERNAME (type: $USER_TYPE)"
+          
           # Check GitHub Copilot Chat API access
+          echo "🔍 Testing Copilot Chat API access..."
           HTTP_CODE=$(curl -s -o /tmp/copilot_check.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.COPILOT_PAT }}" \
+            -H "Authorization: Bearer $COPILOT_PAT" \
             -H "Accept: application/json" \
             -H "Content-Type: application/json" \
             -X POST \
             "https://api.githubcopilot.com/chat/completions" \
             -d '{"messages":[{"role":"user","content":"test"}],"model":"gpt-4o","stream":false,"max_tokens":5}')
           
+          echo "   API Response Code: $HTTP_CODE"
           if [ "$HTTP_CODE" = "200" ]; then
             echo "has_copilot=true" >> $GITHUB_OUTPUT
-            echo "✓ GitHub Copilot Chat API access confirmed"
+            echo "✓ GitHub Copilot Chat API access confirmed for $USERNAME"
           else
             echo "has_copilot=false" >> $GITHUB_OUTPUT
             echo "⚠️  No GitHub Copilot Chat API access detected (HTTP $HTTP_CODE)"
-            cat /tmp/copilot_check.json 2>/dev/null || true
+            echo "   Response body:"
+            cat /tmp/copilot_check.json 2>/dev/null | jq '.' || cat /tmp/copilot_check.json
+            echo ""
+            echo "   TROUBLESHOOTING:"
+            echo "   1. GitHub Copilot Chat API does NOT support fine-grained PATs"
+            echo "   2. You must use a CLASSIC Personal Access Token"
+            echo "   3. Create at: https://github.com/settings/tokens (not /tokens/new for fine-grained)"
+            echo "   4. Required scopes: 'user' (and 'copilot' if available)"
+            echo "   5. Account must have active GitHub Copilot subscription"
             echo "   Will use rule-based analysis instead"
           fi
 
