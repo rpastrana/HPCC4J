@@ -162,20 +162,19 @@ jobs:
         env:
           ANALYSIS_OUTPUT: ${{ steps.analyze.outputs.analysis }}
           ISSUE_NUMBER: ${{ steps.issue_num.outputs.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Only post comment if analysis was generated successfully
           if [ -n "$ANALYSIS_OUTPUT" ]; then
-            cat > comment.md <<'COMMENT'
-## 🤖 GitHub Copilot Issue Analysis
-
-COMMENT
+            # Build comment header
+            echo "## 🤖 GitHub Copilot Issue Analysis" > comment.md
+            echo "" >> comment.md
             # Append the analysis output
             echo "$ANALYSIS_OUTPUT" >> comment.md
-            cat >> comment.md <<'COMMENT'
-
----
-*This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*
-COMMENT
+            # Append footer
+            echo "" >> comment.md
+            echo "---" >> comment.md
+            echo "*This analysis was automatically generated using GitHub Copilot to help ensure issues contain sufficient information for investigation.*" >> comment.md
 
             gh issue comment "$ISSUE_NUMBER" --body-file comment.md
             echo "✓ Analysis comment posted successfully"
@@ -183,8 +182,6 @@ COMMENT
             echo "⚠️  No analysis output to post"
             exit 1
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add label if more info needed
         if: contains(steps.analyze.outputs.analysis, 'NEEDS_MORE_INFO') && !contains(github.event.issue.labels.*.name, 'needs-more-info')
