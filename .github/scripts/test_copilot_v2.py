@@ -100,7 +100,6 @@ def main():
     
     try:
         # Use subprocess.run instead of pexpect - simpler and captures all output
-        import subprocess
         result = subprocess.run(
             ['copilot', '-p', prompt, '--allow-all-tools'],
             env=copilot_env,
