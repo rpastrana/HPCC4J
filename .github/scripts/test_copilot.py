@@ -190,11 +190,19 @@ Please provide:
                 username = accounts[0]
                 print(f"[DEBUG] Will switch to account: {username}")
                 
+                # Create clean environment without GITHUB_TOKEN for the switch
+                switch_env = os.environ.copy()
+                switch_env.pop('GITHUB_TOKEN', None)
+                switch_env.pop('GH_TOKEN', None)
+                
+                print("[DEBUG] Removed GITHUB_TOKEN for gh auth switch")
+                
                 # Switch to this account
                 gh_switch = subprocess.run(
                     ['gh', 'auth', 'switch', '--user', username],
                     capture_output=True,
                     text=True,
+                    env=switch_env,  # Use clean environment
                     timeout=10
                 )
                 
