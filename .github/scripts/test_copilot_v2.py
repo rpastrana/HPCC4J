@@ -77,14 +77,17 @@ def main():
     config_dir = os.path.expanduser("~/.config/.copilot")
     os.makedirs(config_dir, exist_ok=True)
     config_file = os.path.join(config_dir, "config.json")
-    if not os.path.exists(config_file):
-        import json
-        with open(config_file, 'w') as f:
-            json.dump({
-                "telemetry": {"enabled": False}, 
-                "stream": True,
-                "banner": "never"  # Disable animated banner
-            }, f)
+    
+    import json
+    with open(config_file, 'w') as f:
+        json.dump({
+            "telemetry": {"enabled": False}, 
+            "stream": False,  # Disable streaming for complete output
+            "banner": "never",  # Disable animated banner
+            "parallel_tool_execution": True,  # Enable parallel tools
+            "render_markdown": False  # Disable markdown rendering in terminal
+        }, f)
+    print(f"[DEBUG] Created config at {config_file}")
     
     # Prepare prompt
     output_file = f"/tmp/copilot_analysis_{issue_number}.md"
@@ -96,7 +99,9 @@ def main():
     
     try:
         # Spawn copilot with PTY and the -p flag to provide prompt directly
-        child = pexpect.spawn('copilot', ['-p', prompt], env=copilot_env, timeout=90)
+        # Use --allow-tool write to explicitly permit file writing
+        child = pexpect.spawn('copilot', ['-p', prompt, '--allow-tool', 'write'], 
+                            env=copilot_env, timeout=90)
         child.logfile = sys.stdout.buffer  # Log output for debugging
         
         # Wait for copilot to initialize and show prompt
