@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install -g @githubnext/github-copilot-cli
+          npm install -g @github/copilot
           pip install PyGithub requests
 
       - name: Run validation agent
