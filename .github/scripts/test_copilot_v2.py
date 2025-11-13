@@ -87,10 +87,12 @@ def main():
             }, f)
     
     # Prepare prompt
-    prompt = f"Analyze GitHub issue #{issue_number}: {issue_title}. {issue_body[:300]}"
+    output_file = f"/tmp/copilot_analysis_{issue_number}.md"
+    prompt = f"Analyze GitHub issue #{issue_number}: {issue_title}. {issue_body[:300]}. Write your analysis to the file {output_file} in markdown format with sections for: Issue Type, Summary, Priority, and Recommendations."
     
     print(f"[DEBUG] Starting copilot with pexpect (TTY simulation)...")
-    print(f"[DEBUG] Prompt: {prompt[:100]}...")
+    print(f"[DEBUG] Prompt: {prompt[:150]}...")
+    print(f"[DEBUG] Output will be written to: {output_file}")
     
     try:
         # Spawn copilot with PTY
@@ -170,6 +172,20 @@ def main():
             print("=" * 60)
             print(clean_output if clean_output.strip() else "(no response captured)")
             print("=" * 60)
+            
+            # Check if copilot wrote the file
+            print(f"\n[DEBUG] Checking for output file: {output_file}")
+            if os.path.exists(output_file):
+                print("[SUCCESS] Copilot created the output file!")
+                with open(output_file, 'r') as f:
+                    file_content = f.read()
+                print("\n" + "=" * 60)
+                print("COPILOT ANALYSIS FROM FILE:")
+                print("=" * 60)
+                print(file_content)
+                print("=" * 60)
+            else:
+                print("[WARNING] Output file was not created by copilot")
             
             # Try to exit gracefully
             try:
