@@ -261,6 +261,35 @@ Please provide:
     
     # First try a simple test
     print("[DEBUG] Testing copilot with simple prompt...")
+    
+    # Check which copilot binary is being used
+    print("[DEBUG] Locating copilot binary...")
+    try:
+        which_result = subprocess.run(
+            ['which', 'copilot'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if which_result.returncode == 0:
+            copilot_path = which_result.stdout.strip()
+            print(f"[DEBUG] Copilot binary path: {copilot_path}")
+            
+            # Check if it's a symlink
+            readlink_result = subprocess.run(
+                ['readlink', '-f', copilot_path],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if readlink_result.returncode == 0:
+                real_path = readlink_result.stdout.strip()
+                print(f"[DEBUG] Real path (after symlinks): {real_path}")
+        else:
+            print("[WARNING] Could not determine copilot path")
+    except Exception as e:
+        print(f"[WARNING] Error checking copilot path: {e}")
+    
     try:
         test_result = subprocess.run(
             ['copilot', '--version'],
@@ -278,18 +307,25 @@ Please provide:
     # Try copilot with the actual prompt
     print(f"[DEBUG] Running: copilot -p '<prompt of length {len(prompt)}>' --allow-all-tools")
     print("[DEBUG] Note: --allow-all-tools is required for non-interactive mode")
+    print("[DEBUG] This may take 10-30 seconds, please be patient...")
+    
+    import time
+    start_time = time.time()
     
     try:
         # Use -p flag with --allow-all-tools for non-interactive mode
+        # Increased timeout to 120s since API calls can take time
         result = subprocess.run(
             ['copilot', '-p', prompt, '--allow-all-tools'],
             capture_output=True,
             text=True,
             env=copilot_env,
-            timeout=60
+            timeout=120  # Increased from 60 to 120 seconds
         )
         
+        elapsed_time = time.time() - start_time
         print(f"[DEBUG] Copilot command completed with return code: {result.returncode}")
+        print(f"[DEBUG] Execution time: {elapsed_time:.2f} seconds")
         
         if result.returncode == 0:
             print("[SUCCESS] Copilot response received")
@@ -298,6 +334,18 @@ Please provide:
             print("=" * 60)
             print(result.stdout)
             print("=" * 60)
+            
+            # Save output to file for reference
+            try:
+                output_file = f"/tmp/copilot_output_{issue_number}.txt"
+                with open(output_file, 'w') as f:
+                    f.write(f"Issue #{issue_number}: {issue_title}\n")
+                    f.write("=" * 60 + "\n")
+                    f.write(result.stdout)
+                    f.write("\n" + "=" * 60 + "\n")
+                print(f"[DEBUG] Output saved to: {output_file}")
+            except Exception as e:
+                print(f"[WARNING] Could not save output to file: {e}")
             
             if result.stderr:
                 print("[DEBUG] Copilot stderr output:")
