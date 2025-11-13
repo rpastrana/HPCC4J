@@ -108,37 +108,47 @@ def main():
         # Copilot shows a welcome banner first, then waits for input
         print("[DEBUG] Waiting for copilot to process prompt...")
         
-        # Continuously read output until process completes
+        # Read all output continuously using interact_filter or just letting it run
+        # Give copilot plenty of time to complete
+        import time
+        
         all_output = []
-        while True:
+        start_time = time.time()
+        max_runtime = 120  # 2 minutes max
+        no_output_timeout = 10  # If no output for 10 seconds, assume done
+        last_output_time = time.time()
+        
+        while time.time() - start_time < max_runtime:
             try:
-                # Read with short timeout to get incremental output
-                index = child.expect([pexpect.TIMEOUT, pexpect.EOF], timeout=2)
-                
-                # Capture whatever came before the match
-                if child.before:
-                    chunk = child.before.decode('utf-8', errors='ignore')
-                    if chunk:
-                        all_output.append(chunk)
-                        print(f"[DEBUG] Captured {len(chunk)} chars...")
-                
-                # If we hit EOF, process is done
-                if index == 1:
-                    print("[DEBUG] Copilot process completed (EOF)")
+                # Try to read non-blocking
+                chunk = child.read_nonblocking(size=4096, timeout=1)
+                if chunk:
+                    decoded = chunk.decode('utf-8', errors='ignore')
+                    all_output.append(decoded)
+                    last_output_time = time.time()
+                    print(f"[DEBUG] Captured {len(decoded)} chars... (total: {sum(len(s) for s in all_output)})")
+                else:
+                    # No output in this read
+                    if time.time() - last_output_time > no_output_timeout:
+                        print(f"[DEBUG] No output for {no_output_timeout}s, assuming complete")
+                        break
+            except pexpect.TIMEOUT:
+                # Timeout on read - check if we should keep waiting
+                if time.time() - last_output_time > no_output_timeout:
+                    print(f"[DEBUG] No output for {no_output_timeout}s, assuming complete")
                     break
-                    
-            except Exception as e:
-                print(f"[DEBUG] Read exception: {e}")
+            except pexpect.EOF:
+                print("[DEBUG] Process terminated (EOF)")
+                # Try to get any remaining output
+                try:
+                    remaining = child.before
+                    if remaining:
+                        all_output.append(remaining.decode('utf-8', errors='ignore'))
+                except:
+                    pass
                 break
         
-        # Also try to get any remaining output
-        try:
-            remaining = child.read()
-            if remaining:
-                all_output.append(remaining.decode('utf-8', errors='ignore'))
-                print(f"[DEBUG] Captured remaining {len(remaining)} bytes")
-        except:
-            pass
+        print(f"[DEBUG] Collection complete after {time.time() - start_time:.1f}s")
         
         # Combine all output
         full_output = ''.join(all_output)
