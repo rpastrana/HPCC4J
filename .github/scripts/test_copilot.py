@@ -276,7 +276,18 @@ Please provide:
         print(f"[WARNING] Version check failed: {e}")
     
     # Try copilot with the actual prompt
-    print(f"[DEBUG] Running: copilot -p '<prompt of length {len(prompt)}>'")
+    print(f"[DEBUG] Running: copilot -p '<prompt of length {len(prompt)}>' --allow-all-tools")
+    print("[DEBUG] Note: --allow-all-tools is required for non-interactive mode")
+    
+    try:
+        # Use -p flag with --allow-all-tools for non-interactive mode
+        result = subprocess.run(
+            ['copilot', '-p', prompt, '--allow-all-tools'],
+            capture_output=True,
+            text=True,
+            env=copilot_env,
+            timeout=60
+        )
     
     try:
         result = subprocess.run(
