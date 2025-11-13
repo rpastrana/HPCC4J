@@ -416,8 +416,14 @@ Please provide:
                     print(f"[DEBUG] Reading latest log: {log_path}")
                     with open(log_path, 'r') as f:
                         log_content = f.read()
-                        print(f"[DEBUG] Log content (first 1000 chars):")
-                        print(log_content[:1000])
+                        print(f"[DEBUG] Full log content ({len(log_content)} chars):")
+                        print("=" * 60)
+                        print(log_content)
+                        print("=" * 60)
+            except Exception as e:
+                print(f"[DEBUG] Could not read log files: {e}")
+            except Exception as e:
+                print(f"[DEBUG] Could not read log files: {e}")
             except Exception as e:
                 print(f"[DEBUG] Could not read log files: {e}")
                 
