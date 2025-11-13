@@ -166,22 +166,31 @@ Please provide:
         # Switch to the authenticated account (not github-actions[bot])
         print("[DEBUG] Switching to authenticated account...")
         
-        # Get the username from the token
+        # Parse the username from gh auth status output
+        # Look for lines like "✓ Logged in to github.com account USERNAME"
         try:
-            # Call gh api to get the authenticated user
-            gh_user = subprocess.run(
-                ['gh', 'api', 'user', '--jq', '.login'],
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
+            import re
             
-            if gh_user.returncode == 0:
-                username = gh_user.stdout.strip()
-                print(f"[DEBUG] Authenticated as user: {username}")
+            # Find all logged-in accounts from the status output
+            auth_status_text = gh_status.stdout
+            
+            # Parse accounts - look for pattern: "account USERNAME"
+            # Exclude github-actions[bot]
+            accounts = []
+            for line in auth_status_text.split('\n'):
+                match = re.search(r'account\s+(\S+)', line)
+                if match:
+                    account = match.group(1)
+                    if account != 'github-actions[bot]':
+                        accounts.append(account)
+                        print(f"[DEBUG] Found account: {account}")
+            
+            if accounts:
+                # Use the first non-bot account
+                username = accounts[0]
+                print(f"[DEBUG] Will switch to account: {username}")
                 
                 # Switch to this account
-                print(f"[DEBUG] Switching active account to: {username}")
                 gh_switch = subprocess.run(
                     ['gh', 'auth', 'switch', '--user', username],
                     capture_output=True,
@@ -190,7 +199,7 @@ Please provide:
                 )
                 
                 if gh_switch.returncode == 0:
-                    print(f"[SUCCESS] Switched to account: {username}")
+                    print(f"[SUCCESS] Switched active account to: {username}")
                     
                     # Verify the switch worked
                     gh_status2 = subprocess.run(
@@ -204,13 +213,21 @@ Please provide:
                     if gh_status2.stderr:
                         print(f"[DEBUG] stderr: {gh_status2.stderr}")
                 else:
-                    print(f"[WARNING] Could not switch account: {gh_switch.stderr}")
+                    print(f"[ERROR] Could not switch account")
+                    print(f"[ERROR] Return code: {gh_switch.returncode}")
+                    print(f"[ERROR] stdout: {gh_switch.stdout}")
+                    print(f"[ERROR] stderr: {gh_switch.stderr}")
+                    return 1
             else:
-                print(f"[WARNING] Could not get username: {gh_user.stderr}")
+                print("[ERROR] Could not find non-bot account in gh auth status")
+                print("[ERROR] Cannot proceed without switching accounts")
+                return 1
                 
         except Exception as e:
-            print(f"[WARNING] Exception during account switch: {e}")
-            print("[DEBUG] Continuing anyway...")
+            print(f"[ERROR] Exception during account switch: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
             
     except Exception as e:
         print(f"[ERROR] Exception during gh authentication: {e}")
