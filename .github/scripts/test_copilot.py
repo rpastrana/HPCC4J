@@ -109,46 +109,68 @@ Please provide:
     for key in ['GITHUB_TOKEN', 'GH_TOKEN', 'COPILOT_GITHUB_TOKEN']:
         print(f"[DEBUG]   {key} = {env.get(key, 'NOT SET')[:20]}..." if env.get(key) else f"[DEBUG]   {key} = NOT SET")
     
-    # Authenticate GitHub CLI first, which copilot can then use
-    print("[DEBUG] Authenticating GitHub CLI with token...")
+    # Authenticate GitHub CLI with COPILOT_PAT token
+    print("[DEBUG] Authenticating GitHub CLI with COPILOT_PAT...")
+    print(f"[DEBUG] Token to use: {copilot_pat[:20]}...")
+    print(f"[DEBUG] Token length: {len(copilot_pat)}")
+    
+    # Create a clean environment for gh auth login
+    # Remove GitHub Actions token so it doesn't interfere
+    gh_env = os.environ.copy()
+    gh_env.pop('GITHUB_TOKEN', None)  # Remove GitHub Actions token
+    gh_env.pop('GH_TOKEN', None)
+    
+    print("[DEBUG] Removed GITHUB_TOKEN from environment for gh auth")
+    
     try:
-        # Use gh auth login with token from stdin
+        # Use gh auth login with COPILOT_PAT token from stdin
+        # This will authenticate gh CLI which copilot can then use
+        print(f"[DEBUG] Calling: gh auth login --with-token")
+        print(f"[DEBUG] Stdin will receive: {copilot_pat[:10]}...")
+        
         gh_auth = subprocess.run(
             ['gh', 'auth', 'login', '--with-token'],
             input=copilot_pat,
             capture_output=True,
             text=True,
+            env=gh_env,  # Use clean environment
             timeout=30
         )
         
         if gh_auth.returncode == 0:
-            print("[DEBUG] GitHub CLI authentication successful")
-            print(f"[DEBUG] gh auth output: {gh_auth.stdout}")
+            print("[SUCCESS] GitHub CLI authenticated successfully with COPILOT_PAT")
+            if gh_auth.stdout:
+                print(f"[DEBUG] gh auth stdout: {gh_auth.stdout}")
+            if gh_auth.stderr:
+                print(f"[DEBUG] gh auth stderr: {gh_auth.stderr}")
         else:
-            print(f"[WARNING] GitHub CLI authentication failed: {gh_auth.stderr}")
-            print("[DEBUG] Attempting to continue anyway with environment variables...")
+            print(f"[ERROR] GitHub CLI authentication failed")
+            print(f"[ERROR] Return code: {gh_auth.returncode}")
+            print(f"[ERROR] stdout: {gh_auth.stdout}")
+            print(f"[ERROR] stderr: {gh_auth.stderr}")
+            return 1
         
-        # Verify gh authentication
+        # Verify gh authentication status
+        print("[DEBUG] Verifying gh authentication...")
         gh_status = subprocess.run(
             ['gh', 'auth', 'status'],
             capture_output=True,
             text=True,
             timeout=10
         )
-        print(f"[DEBUG] gh auth status: {gh_status.stdout}")
+        print("[DEBUG] gh auth status:")
+        print(gh_status.stdout)
         if gh_status.stderr:
             print(f"[DEBUG] gh auth status stderr: {gh_status.stderr}")
             
     except Exception as e:
-        print(f"[WARNING] Could not authenticate gh CLI: {e}")
-        print("[DEBUG] Continuing with environment variables only...")
+        print(f"[ERROR] Exception during gh authentication: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
     
-    # Also set environment variables as fallback
-    os.environ['GITHUB_TOKEN'] = copilot_pat
-    os.environ['GH_TOKEN'] = copilot_pat
-    os.environ['COPILOT_GITHUB_TOKEN'] = copilot_pat
-    
-    print("[DEBUG] Exported tokens to os.environ")
+    # Now run copilot - it should use the authenticated gh CLI
+    print("[DEBUG] Running copilot command...")
     
     try:
         result = subprocess.run(
