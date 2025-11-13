@@ -162,6 +162,55 @@ Please provide:
         print(gh_status.stdout)
         if gh_status.stderr:
             print(f"[DEBUG] gh auth status stderr: {gh_status.stderr}")
+        
+        # Switch to the authenticated account (not github-actions[bot])
+        print("[DEBUG] Switching to authenticated account...")
+        
+        # Get the username from the token
+        try:
+            # Call gh api to get the authenticated user
+            gh_user = subprocess.run(
+                ['gh', 'api', 'user', '--jq', '.login'],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if gh_user.returncode == 0:
+                username = gh_user.stdout.strip()
+                print(f"[DEBUG] Authenticated as user: {username}")
+                
+                # Switch to this account
+                print(f"[DEBUG] Switching active account to: {username}")
+                gh_switch = subprocess.run(
+                    ['gh', 'auth', 'switch', '--user', username],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if gh_switch.returncode == 0:
+                    print(f"[SUCCESS] Switched to account: {username}")
+                    
+                    # Verify the switch worked
+                    gh_status2 = subprocess.run(
+                        ['gh', 'auth', 'status'],
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    print("[DEBUG] Updated gh auth status:")
+                    print(gh_status2.stdout)
+                    if gh_status2.stderr:
+                        print(f"[DEBUG] stderr: {gh_status2.stderr}")
+                else:
+                    print(f"[WARNING] Could not switch account: {gh_switch.stderr}")
+            else:
+                print(f"[WARNING] Could not get username: {gh_user.stderr}")
+                
+        except Exception as e:
+            print(f"[WARNING] Exception during account switch: {e}")
+            print("[DEBUG] Continuing anyway...")
             
     except Exception as e:
         print(f"[ERROR] Exception during gh authentication: {e}")
