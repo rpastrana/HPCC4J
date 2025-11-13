@@ -320,17 +320,47 @@ Please provide:
     
     # First try a very simple test prompt to isolate the issue
     print("[DEBUG] Testing with minimal prompt first...")
+    
+    # Check if copilot creates log files
+    print("[DEBUG] Checking for copilot log directory...")
+    log_dir = os.path.expanduser("~/.copilot/logs")
+    if os.path.exists(log_dir):
+        print(f"[DEBUG] Log directory exists: {log_dir}")
+        try:
+            log_files = os.listdir(log_dir)
+            print(f"[DEBUG] Log files: {log_files}")
+        except Exception as e:
+            print(f"[DEBUG] Could not list log files: {e}")
+    else:
+        print(f"[DEBUG] Log directory does not exist: {log_dir}")
+    
     try:
         simple_test = subprocess.run(
-            ['copilot', '-p', 'Hello', '--allow-all-tools'],
+            ['copilot', '-p', 'Hello', '--allow-all-tools', '--log-level', 'debug'],
             capture_output=True,
             text=True,
             env=copilot_env,
             timeout=30
         )
         print(f"[DEBUG] Simple test: rc={simple_test.returncode}")
-        print(f"[DEBUG] Simple stdout: {simple_test.stdout[:200] if simple_test.stdout else '(empty)'}")
-        print(f"[DEBUG] Simple stderr: {simple_test.stderr[:200] if simple_test.stderr else '(empty)'}")
+        print(f"[DEBUG] Simple stdout: {simple_test.stdout[:500] if simple_test.stdout else '(empty)'}")
+        print(f"[DEBUG] Simple stderr: {simple_test.stderr[:500] if simple_test.stderr else '(empty)'}")
+        
+        # Check logs after execution
+        if os.path.exists(log_dir):
+            try:
+                log_files = os.listdir(log_dir)
+                if log_files:
+                    latest_log = sorted(log_files)[-1]
+                    log_path = os.path.join(log_dir, latest_log)
+                    print(f"[DEBUG] Reading latest log: {log_path}")
+                    with open(log_path, 'r') as f:
+                        log_content = f.read()
+                        print(f"[DEBUG] Log content (first 1000 chars):")
+                        print(log_content[:1000])
+            except Exception as e:
+                print(f"[DEBUG] Could not read log files: {e}")
+                
     except Exception as e:
         print(f"[WARNING] Simple test failed: {e}")
     
