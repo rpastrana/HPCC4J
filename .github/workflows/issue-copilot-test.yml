@@ -1,0 +1,84 @@
+name: Issue Copilot Test
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  test-copilot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install GitHub Copilot CLI
+        run: |
+          echo "::debug::Installing GitHub Copilot CLI globally"
+          npm install -g @github/copilot
+          echo "::debug::Verifying copilot installation"
+          which copilot || echo "::error::Copilot CLI not found in PATH"
+          copilot --version || echo "::error::Cannot execute copilot command"
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Python dependencies
+        run: |
+          echo "::debug::Installing required Python packages"
+          pip install PyGithub
+          echo "::debug::Python packages installed successfully"
+      
+      - name: Debug environment
+        run: |
+          echo "::debug::=== Environment Debug Info ==="
+          echo "::debug::Issue Number: ${{ github.event.issue.number }}"
+          echo "::debug::Issue Title: ${{ github.event.issue.title }}"
+          echo "::debug::Issue Author: ${{ github.event.issue.user.login }}"
+          echo "::debug::Repository: ${{ github.repository }}"
+          echo "::debug::Event Action: ${{ github.event.action }}"
+          echo "::debug::Node Version: $(node --version)"
+          echo "::debug::NPM Version: $(npm --version)"
+          echo "::debug::Python Version: $(python --version)"
+          echo "::debug::Working Directory: $(pwd)"
+          echo "::debug::=== End Debug Info ==="
+      
+      - name: Run Copilot test script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COPILOT_PAT: ${{ secrets.COPILOT_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "::debug::Starting Copilot test script execution"
+          
+          if [ -z "$COPILOT_PAT" ]; then
+            echo "::error::COPILOT_PAT secret is not set!"
+            echo "Please configure the COPILOT_PAT secret in repository settings"
+            exit 1
+          fi
+          
+          echo "::debug::Environment variables configured"
+          echo "::debug::Executing Python script"
+          
+          python .github/scripts/test_copilot.py
+          
+          exit_code=$?
+          if [ $exit_code -eq 0 ]; then
+            echo "::debug::Script executed successfully"
+          else
+            echo "::error::Script failed with exit code: $exit_code"
+            exit $exit_code
+          fi
