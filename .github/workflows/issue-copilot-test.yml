@@ -19,6 +19,13 @@ jobs:
         with:
           node-version: '22'
       
+      - name: Verify Node.js version
+        run: |
+          echo "::debug::Verifying Node.js installation"
+          node --version
+          npm --version
+          echo "::debug::Node.js version should be v22.x or higher"
+      
       - name: Install GitHub Copilot CLI
         run: |
           echo "::debug::Installing GitHub Copilot CLI globally"
