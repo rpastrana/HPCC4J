@@ -359,6 +359,43 @@ Please provide:
     # Try with explicit log directory
     copilot_env['COPILOT_LOG_DIR'] = log_dir
     
+    # Check if there's a copilot config directory
+    config_dir = os.path.expanduser("~/.copilot")
+    print(f"[DEBUG] Checking copilot config directory: {config_dir}")
+    if os.path.exists(config_dir):
+        print(f"[DEBUG] Config directory exists")
+        try:
+            config_files = os.listdir(config_dir)
+            print(f"[DEBUG] Config files: {config_files}")
+        except Exception as e:
+            print(f"[DEBUG] Could not list config files: {e}")
+    else:
+        print(f"[DEBUG] Config directory does not exist, creating...")
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception as e:
+            print(f"[DEBUG] Could not create config directory: {e}")
+    
+    # Try running with strace to see what's happening
+    print("[DEBUG] Running copilot with strace to debug...")
+    try:
+        strace_result = subprocess.run(
+            ['strace', '-e', 'trace=open,openat,access', 'copilot', '-p', 'Hello', '--allow-all-tools'],
+            capture_output=True,
+            text=True,
+            env=copilot_env,
+            timeout=10
+        )
+        print(f"[DEBUG] Strace rc: {strace_result.returncode}")
+        # strace output goes to stderr
+        strace_lines = strace_result.stderr.split('\n')
+        print(f"[DEBUG] Last 20 strace lines:")
+        for line in strace_lines[-20:]:
+            if line.strip():
+                print(f"  {line}")
+    except Exception as e:
+        print(f"[DEBUG] Strace execution failed: {e}")
+    
     try:
         simple_test = subprocess.run(
             ['copilot', '-p', 'Hello', '--allow-all-tools', '--log-level', 'debug'],
