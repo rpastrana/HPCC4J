@@ -14,17 +14,24 @@ jobs:
         with:
           fetch-depth: 1
       
-      - name: Clear tool cache and setup Node.js 22
+      - name: Install Node.js 22 using nvm
         run: |
-          echo "::debug::Removing cached Node.js installations"
-          sudo rm -rf /opt/hostedtoolcache/node/20.* || true
-          echo "::debug::Tool cache cleared"
-      
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.x'
-          check-latest: true
+          echo "::debug::Installing Node.js 22 using nvm"
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          
+          echo "::debug::Installing Node 22"
+          nvm install 22
+          nvm use 22
+          nvm alias default 22
+          
+          echo "::debug::Verifying installation"
+          node --version
+          npm --version
+          
+          # Add to GitHub PATH for subsequent steps
+          echo "$HOME/.nvm/versions/node/$(nvm version)/bin" >> $GITHUB_PATH
       
       - name: Verify Node.js version
         run: |
