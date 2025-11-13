@@ -257,6 +257,26 @@ Please provide:
     copilot_env['GITHUB_TOKEN'] = copilot_pat
     
     print("[DEBUG] Set GITHUB_TOKEN to COPILOT_PAT for copilot CLI")
+    print(f"[DEBUG] Token in env: {copilot_env['GITHUB_TOKEN'][:20]}...")
+    
+    # First try a simple test
+    print("[DEBUG] Testing copilot with simple prompt...")
+    try:
+        test_result = subprocess.run(
+            ['copilot', '--version'],
+            capture_output=True,
+            text=True,
+            env=copilot_env,
+            timeout=10
+        )
+        print(f"[DEBUG] Copilot version check: rc={test_result.returncode}")
+        print(f"[DEBUG] Version stdout: {test_result.stdout}")
+        print(f"[DEBUG] Version stderr: {test_result.stderr}")
+    except Exception as e:
+        print(f"[WARNING] Version check failed: {e}")
+    
+    # Try copilot with the actual prompt
+    print(f"[DEBUG] Running: copilot -p '<prompt of length {len(prompt)}>'")
     
     try:
         result = subprocess.run(
@@ -284,8 +304,13 @@ Please provide:
             return 0
         else:
             print(f"[ERROR] Copilot command failed with return code: {result.returncode}")
-            print(f"[ERROR] stdout: {result.stdout}")
-            print(f"[ERROR] stderr: {result.stderr}")
+            print(f"[ERROR] stdout: '{result.stdout}' (length: {len(result.stdout)})")
+            print(f"[ERROR] stderr: '{result.stderr}' (length: {len(result.stderr)})")
+            
+            # Try to get more info about what happened
+            if not result.stdout and not result.stderr:
+                print("[DIAGNOSTIC] Command produced no output - may have failed to execute")
+                print("[DIAGNOSTIC] Check if copilot binary exists and is executable")
             
             # Common error diagnostics
             if "authentication" in result.stderr.lower() or "auth" in result.stderr.lower():
