@@ -209,11 +209,12 @@ Please provide:
                 if gh_switch.returncode == 0:
                     print(f"[SUCCESS] Switched active account to: {username}")
                     
-                    # Verify the switch worked
+                    # Verify the switch worked - use clean environment here too
                     gh_status2 = subprocess.run(
                         ['gh', 'auth', 'status'],
                         capture_output=True,
                         text=True,
+                        env=switch_env,  # Use same clean environment
                         timeout=10
                     )
                     print("[DEBUG] Updated gh auth status:")
