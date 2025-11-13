@@ -359,8 +359,8 @@ Please provide:
     # Try with explicit log directory
     copilot_env['COPILOT_LOG_DIR'] = log_dir
     
-    # Check if there's a copilot config directory
-    config_dir = os.path.expanduser("~/.copilot")
+    # Check if there's a copilot config directory - it should be in .config!
+    config_dir = os.path.expanduser("~/.config/.copilot")
     print(f"[DEBUG] Checking copilot config directory: {config_dir}")
     if os.path.exists(config_dir):
         print(f"[DEBUG] Config directory exists")
@@ -370,31 +370,29 @@ Please provide:
         except Exception as e:
             print(f"[DEBUG] Could not list config files: {e}")
     else:
-        print(f"[DEBUG] Config directory does not exist, creating...")
+        print(f"[DEBUG] Config directory does not exist at ~/.config/.copilot")
+        print(f"[DEBUG] Creating config directory and minimal config file...")
         try:
             os.makedirs(config_dir, exist_ok=True)
+            # Create a minimal config.json
+            config_file = os.path.join(config_dir, "config.json")
+            with open(config_file, 'w') as f:
+                import json
+                config = {
+                    "telemetry": {
+                        "enabled": False
+                    }
+                }
+                json.dump(config, f, indent=2)
+            print(f"[DEBUG] Created config file: {config_file}")
         except Exception as e:
-            print(f"[DEBUG] Could not create config directory: {e}")
+            print(f"[DEBUG] Could not create config directory/file: {e}")
     
-    # Try running with strace to see what's happening
-    print("[DEBUG] Running copilot with strace to debug...")
-    try:
-        strace_result = subprocess.run(
-            ['strace', '-e', 'trace=open,openat,access', 'copilot', '-p', 'Hello', '--allow-all-tools'],
-            capture_output=True,
-            text=True,
-            env=copilot_env,
-            timeout=10
-        )
-        print(f"[DEBUG] Strace rc: {strace_result.returncode}")
-        # strace output goes to stderr
-        strace_lines = strace_result.stderr.split('\n')
-        print(f"[DEBUG] Last 20 strace lines:")
-        for line in strace_lines[-20:]:
-            if line.strip():
-                print(f"  {line}")
-    except Exception as e:
-        print(f"[DEBUG] Strace execution failed: {e}")
+    # Update log directory path to match config structure
+    log_dir = os.path.join(config_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    copilot_env['COPILOT_LOG_DIR'] = log_dir
+    print(f"[DEBUG] Updated log directory to: {log_dir}")
     
     try:
         simple_test = subprocess.run(
