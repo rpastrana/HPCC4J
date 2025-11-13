@@ -14,10 +14,17 @@ jobs:
         with:
           fetch-depth: 1
       
+      - name: Clear tool cache and setup Node.js 22
+        run: |
+          echo "::debug::Removing cached Node.js installations"
+          sudo rm -rf /opt/hostedtoolcache/node/20.* || true
+          echo "::debug::Tool cache cleared"
+      
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          check-latest: true
       
       - name: Verify Node.js version
         run: |
