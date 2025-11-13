@@ -18,21 +18,47 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
       
-      - name: Verify Node.js version
+      - name: Verify and fix Node.js version
         run: |
-          echo "::debug::Verifying Node.js installation"
+          echo "::debug::Checking current Node.js version"
+          which node
+          node --version
+          which npm
+          npm --version
+          
+          echo "::debug::Checking if nvm is available"
+          if [ -d "$HOME/.nvm" ]; then
+            echo "::debug::Loading nvm"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 22 || nvm install 22
+            nvm alias default 22
+          fi
+          
+          echo "::debug::Final Node.js version check"
           node --version
           npm --version
-          echo "::debug::Node.js version should be v22.x or higher"
+          
+          if [[ $(node --version) != v22* ]]; then
+            echo "::error::Node.js version is not 22.x"
+            exit 1
+          fi
+          
+          echo "::debug::Node.js 22 is active"
       
       - name: Install GitHub Copilot CLI
         run: |
+          echo "::debug::Current Node version before install: $(node --version)"
           echo "::debug::Installing GitHub Copilot CLI globally"
-          npm install -g @github/copilot
+          npm install -g @github/copilot --verbose
           echo "::debug::Verifying copilot installation"
           which copilot || echo "::error::Copilot CLI not found in PATH"
           copilot --version || echo "::error::Cannot execute copilot command"
+          echo "::debug::NPM global packages:"
+          npm list -g --depth=0
       
       - name: Setup Python
         uses: actions/setup-python@v5
