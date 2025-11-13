@@ -90,118 +90,71 @@ def main():
     output_file = f"/tmp/copilot_analysis_{issue_number}.md"
     prompt = f"Analyze GitHub issue #{issue_number}: {issue_title}. {issue_body[:300]}. Write your analysis to the file {output_file} in markdown format with sections for: Issue Type, Summary, Priority, and Recommendations."
     
-    print(f"[DEBUG] Starting copilot with pexpect (TTY simulation)...")
+    print(f"[DEBUG] Starting copilot with pexpect (PTY simulation)...")
     print(f"[DEBUG] Prompt: {prompt[:150]}...")
     print(f"[DEBUG] Output will be written to: {output_file}")
     
     try:
-        # Spawn copilot with PTY
-        child = pexpect.spawn('copilot', env=copilot_env, timeout=60)
+        # Spawn copilot with PTY and the -p flag to provide prompt directly
+        child = pexpect.spawn('copilot', ['-p', prompt], env=copilot_env, timeout=90)
         child.logfile = sys.stdout.buffer  # Log output for debugging
         
         # Wait for copilot to initialize and show prompt
         # Copilot shows a welcome banner first, then waits for input
-        print("[DEBUG] Waiting for copilot to initialize...")
+        print("[DEBUG] Waiting for copilot to process prompt...")
         
-        # Look for various possible prompts or indicators that copilot is ready
-        # The banner shows "● Connected to GitHub MCP Server" when ready
+        # When using -p flag, copilot will process immediately
+        # Wait for it to complete (EOF or timeout)
         index = child.expect([
-            'Connected to GitHub MCP Server',  # 0: Ready indicator
-            'check for mistakes',               # 1: End of welcome message
-            'error',                            # 2: Error
-            pexpect.TIMEOUT,                    # 3: Timeout
-            pexpect.EOF                         # 4: EOF
-        ], timeout=30)
+            pexpect.EOF,      # 0: Normal completion
+            pexpect.TIMEOUT   # 1: Timeout
+        ], timeout=90)
         
-        if index in [0, 1]:
-            print(f"[DEBUG] Copilot initialized (matched pattern index={index})")
-            
-            # Wait a moment for the prompt to appear
-            import time
-            time.sleep(2)
-            
-            # Now send the prompt
-            print("[DEBUG] Sending prompt...")
-            child.sendline(prompt)
-            
-            # Wait for the AI to generate a response
-            print("[DEBUG] Waiting for AI response (this may take 30-60 seconds)...")
-            
-            # Give copilot time to fully generate and render the response
-            time.sleep(45)  # Wait for AI generation to complete
-            
-            # Send Ctrl+L to trigger a screen refresh/redraw
-            child.sendcontrol('l')
-            time.sleep(1)
-            
-            # Now capture everything visible on the terminal screen
-            # Send a newline to get current screen state
-            child.sendline('')
-            time.sleep(2)
-            
-            # Try to get the terminal's screen contents
-            # Read whatever is available
-            try:
-                child.expect([pexpect.TIMEOUT], timeout=3)
-            except:
-                pass
-            
-            # Get the raw output including all escape sequences
-            raw_output = child.before.decode('utf-8', errors='ignore') if child.before else ""
-            
-            # Also try reading from child directly
-            try:
-                remaining = child.read_nonblocking(size=8192, timeout=1)
-                raw_output += remaining.decode('utf-8', errors='ignore')
-            except:
-                pass
-            
-            # Strip ANSI escape sequences to get readable text
-            import re
-            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-            clean_output = ansi_escape.sub('', raw_output)
-            
+        print(f"[DEBUG] Copilot finished (exit reason: {'EOF' if index == 0 else 'TIMEOUT'})")
+        
+        # Get all output
+        all_output = child.before.decode('utf-8', errors='ignore') if child.before else ""
+        
+        # Strip ANSI escape sequences to get readable text
+        import re
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        clean_output = ansi_escape.sub('', all_output)
+        
+        print("\n" + "=" * 60)
+        print("RAW COPILOT OUTPUT (first 2000 chars):")
+        print("=" * 60)
+        print(all_output[:2000])
+        print("=" * 60)
+        
+        print("\n" + "=" * 60)
+        print("CLEANED COPILOT RESPONSE:")
+        print("=" * 60)
+        print(clean_output if clean_output.strip() else "(no response captured)")
+        print("=" * 60)
+        
+        # Check if copilot wrote the file
+        import time
+        time.sleep(2)  # Give filesystem a moment to sync
+        print(f"\n[DEBUG] Checking for output file: {output_file}")
+        if os.path.exists(output_file):
+            print("[SUCCESS] Copilot created the output file!")
+            with open(output_file, 'r') as f:
+                file_content = f.read()
             print("\n" + "=" * 60)
-            print("RAW COPILOT OUTPUT (first 2000 chars):")
+            print("COPILOT ANALYSIS FROM FILE:")
             print("=" * 60)
-            print(raw_output[:2000])
+            print(file_content)
             print("=" * 60)
-            
-            print("\n" + "=" * 60)
-            print("CLEANED COPILOT RESPONSE:")
-            print("=" * 60)
-            print(clean_output if clean_output.strip() else "(no response captured)")
-            print("=" * 60)
-            
-            # Check if copilot wrote the file
-            print(f"\n[DEBUG] Checking for output file: {output_file}")
-            if os.path.exists(output_file):
-                print("[SUCCESS] Copilot created the output file!")
-                with open(output_file, 'r') as f:
-                    file_content = f.read()
-                print("\n" + "=" * 60)
-                print("COPILOT ANALYSIS FROM FILE:")
-                print("=" * 60)
-                print(file_content)
-                print("=" * 60)
-            else:
-                print("[WARNING] Output file was not created by copilot")
-            
-            # Try to exit gracefully
-            try:
-                child.sendcontrol('d')  # Send Ctrl+D to exit
-                time.sleep(1)
-            except:
-                pass
-            
-            child.close()
-            return 0
         else:
-            print(f"[ERROR] Unexpected response from copilot (index={index})")
-            print(f"[ERROR] Before: {child.before}")
-            if child.after:
-                print(f"[ERROR] After: {child.after}")
-            return 1
+            print("[WARNING] Output file was not created by copilot")
+        
+        # Try to close gracefully
+        try:
+            child.close()
+        except:
+            pass
+        
+        return 0
             
     except pexpect.exceptions.TIMEOUT:
         print("[ERROR] Timeout waiting for copilot")
