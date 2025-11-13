@@ -123,49 +123,52 @@ def main():
             child.sendline(prompt)
             
             # Wait for the AI to generate a response
-            # Copilot will show thinking indicators, then generate response
             print("[DEBUG] Waiting for AI response (this may take 30-60 seconds)...")
             
-            # Give copilot plenty of time to generate the response
-            time.sleep(5)  # Initial wait for processing to start
+            # Give copilot time to fully generate and render the response
+            time.sleep(45)  # Wait for AI generation to complete
             
-            # Now wait for output to stabilize (no new output for a few seconds)
-            output_buffer = []
-            stable_count = 0
-            max_wait = 60  # Maximum 60 seconds total wait
-            start_wait = time.time()
+            # Send Ctrl+L to trigger a screen refresh/redraw
+            child.sendcontrol('l')
+            time.sleep(1)
             
-            while time.time() - start_wait < max_wait:
-                try:
-                    # Try to read with short timeout
-                    child.expect([pexpect.TIMEOUT], timeout=2)
-                    if child.before:
-                        new_data = child.before.decode('utf-8', errors='ignore')
-                        if new_data.strip():
-                            output_buffer.append(new_data)
-                            stable_count = 0  # Reset stability counter
-                            print(f"[DEBUG] Received {len(new_data)} chars...")
-                        else:
-                            stable_count += 1
-                    else:
-                        stable_count += 1
-                    
-                    # If output has been stable for 3 cycles (6 seconds), we're done
-                    if stable_count >= 3:
-                        print("[DEBUG] Output appears complete")
-                        break
-                        
-                except Exception as e:
-                    print(f"[DEBUG] Read exception: {e}")
-                    break
+            # Now capture everything visible on the terminal screen
+            # Send a newline to get current screen state
+            child.sendline('')
+            time.sleep(2)
             
-            # Combine all output
-            full_output = ''.join(output_buffer)
+            # Try to get the terminal's screen contents
+            # Read whatever is available
+            try:
+                child.expect([pexpect.TIMEOUT], timeout=3)
+            except:
+                pass
+            
+            # Get the raw output including all escape sequences
+            raw_output = child.before.decode('utf-8', errors='ignore') if child.before else ""
+            
+            # Also try reading from child directly
+            try:
+                remaining = child.read_nonblocking(size=8192, timeout=1)
+                raw_output += remaining.decode('utf-8', errors='ignore')
+            except:
+                pass
+            
+            # Strip ANSI escape sequences to get readable text
+            import re
+            ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+            clean_output = ansi_escape.sub('', raw_output)
             
             print("\n" + "=" * 60)
-            print("COPILOT RESPONSE:")
+            print("RAW COPILOT OUTPUT (first 2000 chars):")
             print("=" * 60)
-            print(full_output if full_output.strip() else "(no response captured)")
+            print(raw_output[:2000])
+            print("=" * 60)
+            
+            print("\n" + "=" * 60)
+            print("CLEANED COPILOT RESPONSE:")
+            print("=" * 60)
+            print(clean_output if clean_output.strip() else "(no response captured)")
             print("=" * 60)
             
             # Try to exit gracefully
