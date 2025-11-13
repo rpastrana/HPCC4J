@@ -256,8 +256,14 @@ Please provide:
     # Set our PAT token for copilot
     copilot_env['GITHUB_TOKEN'] = copilot_pat
     
+    # Set additional environment variables that copilot might need
+    copilot_env['TERM'] = 'dumb'  # Indicate non-interactive terminal
+    copilot_env['CI'] = 'true'  # Indicate CI environment
+    copilot_env['COPILOT_ALLOW_ALL'] = '1'  # Alternative to --allow-all-tools flag
+    
     print("[DEBUG] Set GITHUB_TOKEN to COPILOT_PAT for copilot CLI")
     print(f"[DEBUG] Token in env: {copilot_env['GITHUB_TOKEN'][:20]}...")
+    print(f"[DEBUG] TERM={copilot_env.get('TERM')}, CI={copilot_env.get('CI')}")
     
     # First try a simple test
     print("[DEBUG] Testing copilot with simple prompt...")
@@ -311,6 +317,22 @@ Please provide:
     
     import time
     start_time = time.time()
+    
+    # First try a very simple test prompt to isolate the issue
+    print("[DEBUG] Testing with minimal prompt first...")
+    try:
+        simple_test = subprocess.run(
+            ['copilot', '-p', 'Hello', '--allow-all-tools'],
+            capture_output=True,
+            text=True,
+            env=copilot_env,
+            timeout=30
+        )
+        print(f"[DEBUG] Simple test: rc={simple_test.returncode}")
+        print(f"[DEBUG] Simple stdout: {simple_test.stdout[:200] if simple_test.stdout else '(empty)'}")
+        print(f"[DEBUG] Simple stderr: {simple_test.stderr[:200] if simple_test.stderr else '(empty)'}")
+    except Exception as e:
+        print(f"[WARNING] Simple test failed: {e}")
     
     try:
         # Use -p flag with --allow-all-tools for non-interactive mode
