@@ -431,10 +431,12 @@ Please provide:
         print(f"[WARNING] Simple test failed: {e}")
     
     try:
-        # Use -p flag with --allow-all-tools for non-interactive mode
-        # Increased timeout to 120s since API calls can take time
+        # Try using stdin instead of -p flag for better non-interactive support
+        # The copilot CLI might be expecting input on stdin when in non-interactive mode
+        print("[DEBUG] Trying copilot with prompt on stdin...")
         result = subprocess.run(
-            ['copilot', '-p', prompt, '--allow-all-tools'],
+            ['copilot', '--allow-all-tools'],
+            input=prompt,  # Send prompt via stdin
             capture_output=True,
             text=True,
             env=copilot_env,
