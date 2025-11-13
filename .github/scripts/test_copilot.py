@@ -288,15 +288,6 @@ Please provide:
             env=copilot_env,
             timeout=60
         )
-    
-    try:
-        result = subprocess.run(
-            ['copilot', '-p', prompt],
-            capture_output=True,
-            text=True,
-            env=copilot_env,
-            timeout=60
-        )
         
         print(f"[DEBUG] Copilot command completed with return code: {result.returncode}")
         
