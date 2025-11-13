@@ -93,81 +93,49 @@ def main():
     output_file = f"/tmp/copilot_analysis_{issue_number}.md"
     prompt = f"Analyze GitHub issue #{issue_number}: {issue_title}. {issue_body[:300]}. Write your analysis to the file {output_file} in markdown format with sections for: Issue Type, Summary, Priority, and Recommendations."
     
-    print(f"[DEBUG] Starting copilot with pexpect (PTY simulation)...")
+    print(f"[DEBUG] Starting copilot with subprocess instead of pexpect...")
     print(f"[DEBUG] Prompt: {prompt[:150]}...")
     print(f"[DEBUG] Output will be written to: {output_file}")
+    print(f"[DEBUG] Command: copilot -p '<prompt>' --allow-all-tools")
     
     try:
-        # Spawn copilot with PTY and the -p flag to provide prompt directly
-        # Use --allow-all-tools to pre-approve all tool usage (no interactive prompts)
-        child = pexpect.spawn('copilot', ['-p', prompt, '--allow-all-tools'], 
-                            env=copilot_env, timeout=120)
-        child.logfile = sys.stdout.buffer  # Log output for debugging
+        # Use subprocess.run instead of pexpect - simpler and captures all output
+        import subprocess
+        result = subprocess.run(
+            ['copilot', '-p', prompt, '--allow-all-tools'],
+            env=copilot_env,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
         
-        # Wait for copilot to initialize and show prompt
-        # Copilot shows a welcome banner first, then waits for input
-        print("[DEBUG] Waiting for copilot to process prompt...")
+        print(f"[DEBUG] Process completed with exit code: {result.returncode}")
         
-        # Read all output continuously using interact_filter or just letting it run
-        # Give copilot plenty of time to complete
-        import time
-        
-        all_output = []
-        start_time = time.time()
-        max_runtime = 120  # 2 minutes max
-        no_output_timeout = 10  # If no output for 10 seconds, assume done
-        last_output_time = time.time()
-        
-        while time.time() - start_time < max_runtime:
-            try:
-                # Try to read non-blocking
-                chunk = child.read_nonblocking(size=4096, timeout=1)
-                if chunk:
-                    decoded = chunk.decode('utf-8', errors='ignore')
-                    all_output.append(decoded)
-                    last_output_time = time.time()
-                    print(f"[DEBUG] Captured {len(decoded)} chars... (total: {sum(len(s) for s in all_output)})")
-                else:
-                    # No output in this read
-                    if time.time() - last_output_time > no_output_timeout:
-                        print(f"[DEBUG] No output for {no_output_timeout}s, assuming complete")
-                        break
-            except pexpect.TIMEOUT:
-                # Timeout on read - check if we should keep waiting
-                if time.time() - last_output_time > no_output_timeout:
-                    print(f"[DEBUG] No output for {no_output_timeout}s, assuming complete")
-                    break
-            except pexpect.EOF:
-                print("[DEBUG] Process terminated (EOF)")
-                # Try to get any remaining output
-                try:
-                    remaining = child.before
-                    if remaining:
-                        all_output.append(remaining.decode('utf-8', errors='ignore'))
-                except:
-                    pass
-                break
-        
-        print(f"[DEBUG] Collection complete after {time.time() - start_time:.1f}s")
-        
-        # Combine all output
-        full_output = ''.join(all_output)
+        full_output = result.stdout
+        stderr_output = result.stderr
         
         # Strip ANSI escape sequences to get readable text
         import re
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         clean_output = ansi_escape.sub('', full_output)
+        clean_stderr = ansi_escape.sub('', stderr_output)
         
         print("\n" + "=" * 60)
-        print(f"FULL COPILOT OUTPUT ({len(full_output)} chars total):")
+        print(f"STDOUT ({len(full_output)} chars):")
         print("=" * 60)
-        print(full_output)
+        print(full_output if full_output else "(empty)")
         print("=" * 60)
         
         print("\n" + "=" * 60)
-        print("CLEANED COPILOT RESPONSE (without ANSI codes):")
+        print(f"STDERR ({len(stderr_output)} chars):")
         print("=" * 60)
-        print(clean_output if clean_output.strip() else "(no response captured)")
+        print(stderr_output if stderr_output else "(empty)")
+        print("=" * 60)
+        
+        print("\n" + "=" * 60)
+        print("CLEANED OUTPUT (without ANSI codes):")
+        print("=" * 60)
+        print(clean_output if clean_output.strip() else "(no output)")
         print("=" * 60)
         
         # Check if copilot wrote the file
@@ -183,19 +151,13 @@ def main():
             print("=" * 60)
             print(file_content)
             print("=" * 60)
+            return 0
         else:
             print("[WARNING] Output file was not created by copilot")
-        
-        # Try to close gracefully
-        try:
-            child.close()
-        except:
-            pass
-        
-        return 0
+            return 1
             
-    except pexpect.exceptions.TIMEOUT:
-        print("[ERROR] Timeout waiting for copilot")
+    except subprocess.TimeoutExpired:
+        print("[ERROR] Copilot command timed out after 120 seconds")
         return 1
     except Exception as e:
         print(f"[ERROR] Failed to run copilot: {e}")
