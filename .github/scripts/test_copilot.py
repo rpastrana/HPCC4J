@@ -247,11 +247,23 @@ Please provide:
     # Now run copilot - it should use the authenticated gh CLI
     print("[DEBUG] Running copilot command...")
     
+    # Copilot needs GITHUB_TOKEN in env, but we'll use the PAT token
+    # since gh auth switch worked
+    copilot_env = os.environ.copy()
+    # Remove the GitHub Actions token
+    copilot_env.pop('GITHUB_TOKEN', None)
+    copilot_env.pop('GH_TOKEN', None)
+    # Set our PAT token for copilot
+    copilot_env['GITHUB_TOKEN'] = copilot_pat
+    
+    print("[DEBUG] Set GITHUB_TOKEN to COPILOT_PAT for copilot CLI")
+    
     try:
         result = subprocess.run(
             ['copilot', '-p', prompt],
             capture_output=True,
             text=True,
+            env=copilot_env,
             timeout=60
         )
         
