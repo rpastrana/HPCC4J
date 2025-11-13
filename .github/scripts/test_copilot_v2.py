@@ -99,40 +99,63 @@ def main():
     
     try:
         # Spawn copilot with PTY and the -p flag to provide prompt directly
-        # Use --allow-tool write to explicitly permit file writing
-        child = pexpect.spawn('copilot', ['-p', prompt, '--allow-tool', 'write'], 
-                            env=copilot_env, timeout=90)
+        # Use --allow-all-tools to pre-approve all tool usage (no interactive prompts)
+        child = pexpect.spawn('copilot', ['-p', prompt, '--allow-all-tools'], 
+                            env=copilot_env, timeout=120)
         child.logfile = sys.stdout.buffer  # Log output for debugging
         
         # Wait for copilot to initialize and show prompt
         # Copilot shows a welcome banner first, then waits for input
         print("[DEBUG] Waiting for copilot to process prompt...")
         
-        # When using -p flag, copilot will process immediately
-        # Wait for it to complete (EOF or timeout)
-        index = child.expect([
-            pexpect.EOF,      # 0: Normal completion
-            pexpect.TIMEOUT   # 1: Timeout
-        ], timeout=90)
+        # Continuously read output until process completes
+        all_output = []
+        while True:
+            try:
+                # Read with short timeout to get incremental output
+                index = child.expect([pexpect.TIMEOUT, pexpect.EOF], timeout=2)
+                
+                # Capture whatever came before the match
+                if child.before:
+                    chunk = child.before.decode('utf-8', errors='ignore')
+                    if chunk:
+                        all_output.append(chunk)
+                        print(f"[DEBUG] Captured {len(chunk)} chars...")
+                
+                # If we hit EOF, process is done
+                if index == 1:
+                    print("[DEBUG] Copilot process completed (EOF)")
+                    break
+                    
+            except Exception as e:
+                print(f"[DEBUG] Read exception: {e}")
+                break
         
-        print(f"[DEBUG] Copilot finished (exit reason: {'EOF' if index == 0 else 'TIMEOUT'})")
+        # Also try to get any remaining output
+        try:
+            remaining = child.read()
+            if remaining:
+                all_output.append(remaining.decode('utf-8', errors='ignore'))
+                print(f"[DEBUG] Captured remaining {len(remaining)} bytes")
+        except:
+            pass
         
-        # Get all output
-        all_output = child.before.decode('utf-8', errors='ignore') if child.before else ""
+        # Combine all output
+        full_output = ''.join(all_output)
         
         # Strip ANSI escape sequences to get readable text
         import re
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        clean_output = ansi_escape.sub('', all_output)
+        clean_output = ansi_escape.sub('', full_output)
         
         print("\n" + "=" * 60)
-        print("RAW COPILOT OUTPUT (first 2000 chars):")
+        print(f"FULL COPILOT OUTPUT ({len(full_output)} chars total):")
         print("=" * 60)
-        print(all_output[:2000])
+        print(full_output)
         print("=" * 60)
         
         print("\n" + "=" * 60)
-        print("CLEANED COPILOT RESPONSE:")
+        print("CLEANED COPILOT RESPONSE (without ANSI codes):")
         print("=" * 60)
         print(clean_output if clean_output.strip() else "(no response captured)")
         print("=" * 60)
