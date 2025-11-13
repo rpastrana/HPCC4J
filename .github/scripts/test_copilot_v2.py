@@ -80,7 +80,11 @@ def main():
     if not os.path.exists(config_file):
         import json
         with open(config_file, 'w') as f:
-            json.dump({"telemetry": {"enabled": False}, "stream": True}, f)
+            json.dump({
+                "telemetry": {"enabled": False}, 
+                "stream": True,
+                "banner": "never"  # Disable animated banner
+            }, f)
     
     # Prepare prompt
     prompt = f"Analyze GitHub issue #{issue_number}: {issue_title}. {issue_body[:300]}"
@@ -94,31 +98,65 @@ def main():
         child.logfile = sys.stdout.buffer  # Log output for debugging
         
         # Wait for copilot to initialize and show prompt
+        # Copilot shows a welcome banner first, then waits for input
         print("[DEBUG] Waiting for copilot to initialize...")
-        index = child.expect(['>', 'error', pexpect.TIMEOUT, pexpect.EOF], timeout=30)
         
-        if index == 0:
-            print("[DEBUG] Copilot ready, sending prompt...")
+        # Look for various possible prompts or indicators that copilot is ready
+        # The banner shows "● Connected to GitHub MCP Server" when ready
+        index = child.expect([
+            'Connected to GitHub MCP Server',  # 0: Ready indicator
+            'check for mistakes',               # 1: End of welcome message
+            'error',                            # 2: Error
+            pexpect.TIMEOUT,                    # 3: Timeout
+            pexpect.EOF                         # 4: EOF
+        ], timeout=30)
+        
+        if index in [0, 1]:
+            print(f"[DEBUG] Copilot initialized (matched pattern index={index})")
+            
+            # Wait a moment for the prompt to appear
+            import time
+            time.sleep(2)
+            
+            # Now send the prompt
+            print("[DEBUG] Sending prompt...")
             child.sendline(prompt)
             
-            # Wait for response
+            # Wait for the response to complete
+            # Look for end of response or timeout
             print("[DEBUG] Waiting for response...")
-            child.expect([pexpect.TIMEOUT, pexpect.EOF], timeout=60)
+            try:
+                child.expect([pexpect.TIMEOUT], timeout=45)
+            except:
+                pass
             
             # Get all output
             output = child.before.decode('utf-8', errors='ignore') if child.before else ""
+            
+            # Also check if there's anything in the buffer
+            child.sendline('')  # Send empty line to get any remaining output
+            time.sleep(1)
+            
             print("\n" + "=" * 60)
             print("COPILOT RESPONSE:")
             print("=" * 60)
             print(output)
             print("=" * 60)
             
-            child.sendline('/exit')
+            # Try to exit gracefully
+            try:
+                child.sendcontrol('d')  # Send Ctrl+D to exit
+                time.sleep(1)
+            except:
+                pass
+            
             child.close()
             return 0
         else:
             print(f"[ERROR] Unexpected response from copilot (index={index})")
             print(f"[ERROR] Before: {child.before}")
+            if child.after:
+                print(f"[ERROR] After: {child.after}")
             return 1
             
     except pexpect.exceptions.TIMEOUT:
