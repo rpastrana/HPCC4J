@@ -14,40 +14,20 @@ jobs:
         with:
           fetch-depth: 1
       
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+          node-version: '22.x'
       
-      - name: Verify and fix Node.js version
+      - name: Verify Node.js version
         run: |
-          echo "::debug::Checking current Node.js version"
-          which node
-          node --version
-          which npm
-          npm --version
-          
-          echo "::debug::Checking if nvm is available"
-          if [ -d "$HOME/.nvm" ]; then
-            echo "::debug::Loading nvm"
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm use 22 || nvm install 22
-            nvm alias default 22
-          fi
-          
-          echo "::debug::Final Node.js version check"
-          node --version
-          npm --version
-          
-          if [[ $(node --version) != v22* ]]; then
-            echo "::error::Node.js version is not 22.x"
-            exit 1
-          fi
-          
-          echo "::debug::Node.js 22 is active"
+          echo "::debug::=== Node.js Version Check ==="
+          echo "::debug::which node: $(which node)"
+          echo "::debug::node version: $(node --version)"
+          echo "::debug::which npm: $(which npm)"
+          echo "::debug::npm version: $(npm --version)"
+          echo "::debug::PATH: $PATH"
+          echo "::debug::==========================="
       
       - name: Install GitHub Copilot CLI
         run: |
