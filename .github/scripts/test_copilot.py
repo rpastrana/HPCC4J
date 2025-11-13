@@ -321,6 +321,22 @@ Please provide:
     # First try a very simple test prompt to isolate the issue
     print("[DEBUG] Testing with minimal prompt first...")
     
+    # Try running copilot via node directly to get better error messages
+    print("[DEBUG] Attempting to run copilot via Node.js directly...")
+    try:
+        node_result = subprocess.run(
+            ['node', '/home/runner/.nvm/versions/node/v22.21.1/lib/node_modules/@github/copilot/index.js', '--version'],
+            capture_output=True,
+            text=True,
+            env=copilot_env,
+            timeout=10
+        )
+        print(f"[DEBUG] Node.js direct execution: rc={node_result.returncode}")
+        print(f"[DEBUG] Node stdout: {node_result.stdout[:500] if node_result.stdout else '(empty)'}")
+        print(f"[DEBUG] Node stderr: {node_result.stderr[:500] if node_result.stderr else '(empty)'}")
+    except Exception as e:
+        print(f"[DEBUG] Node.js direct execution failed: {e}")
+    
     # Check if copilot creates log files
     print("[DEBUG] Checking for copilot log directory...")
     log_dir = os.path.expanduser("~/.copilot/logs")
@@ -333,6 +349,15 @@ Please provide:
             print(f"[DEBUG] Could not list log files: {e}")
     else:
         print(f"[DEBUG] Log directory does not exist: {log_dir}")
+        # Try creating it
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            print(f"[DEBUG] Created log directory: {log_dir}")
+        except Exception as e:
+            print(f"[DEBUG] Could not create log directory: {e}")
+    
+    # Try with explicit log directory
+    copilot_env['COPILOT_LOG_DIR'] = log_dir
     
     try:
         simple_test = subprocess.run(
