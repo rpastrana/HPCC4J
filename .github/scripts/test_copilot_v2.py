@@ -122,25 +122,50 @@ def main():
             print("[DEBUG] Sending prompt...")
             child.sendline(prompt)
             
-            # Wait for the response to complete
-            # Look for end of response or timeout
-            print("[DEBUG] Waiting for response...")
-            try:
-                child.expect([pexpect.TIMEOUT], timeout=45)
-            except:
-                pass
+            # Wait for the AI to generate a response
+            # Copilot will show thinking indicators, then generate response
+            print("[DEBUG] Waiting for AI response (this may take 30-60 seconds)...")
             
-            # Get all output
-            output = child.before.decode('utf-8', errors='ignore') if child.before else ""
+            # Give copilot plenty of time to generate the response
+            time.sleep(5)  # Initial wait for processing to start
             
-            # Also check if there's anything in the buffer
-            child.sendline('')  # Send empty line to get any remaining output
-            time.sleep(1)
+            # Now wait for output to stabilize (no new output for a few seconds)
+            output_buffer = []
+            stable_count = 0
+            max_wait = 60  # Maximum 60 seconds total wait
+            start_wait = time.time()
+            
+            while time.time() - start_wait < max_wait:
+                try:
+                    # Try to read with short timeout
+                    child.expect([pexpect.TIMEOUT], timeout=2)
+                    if child.before:
+                        new_data = child.before.decode('utf-8', errors='ignore')
+                        if new_data.strip():
+                            output_buffer.append(new_data)
+                            stable_count = 0  # Reset stability counter
+                            print(f"[DEBUG] Received {len(new_data)} chars...")
+                        else:
+                            stable_count += 1
+                    else:
+                        stable_count += 1
+                    
+                    # If output has been stable for 3 cycles (6 seconds), we're done
+                    if stable_count >= 3:
+                        print("[DEBUG] Output appears complete")
+                        break
+                        
+                except Exception as e:
+                    print(f"[DEBUG] Read exception: {e}")
+                    break
+            
+            # Combine all output
+            full_output = ''.join(output_buffer)
             
             print("\n" + "=" * 60)
             print("COPILOT RESPONSE:")
             print("=" * 60)
-            print(output)
+            print(full_output if full_output.strip() else "(no response captured)")
             print("=" * 60)
             
             # Try to exit gracefully
