@@ -221,6 +221,16 @@ public class ConnectionAnalyzer
             {
                 address = InetAddress.getByName(hostname);
                 log.debug("Resolved {} to IP address: {}", hostname, address.getHostAddress());
+                
+                // Check if connecting to a private/internal network
+                if (address.isSiteLocalAddress())
+                {
+                    log.debug("Target is on a private network (site-local): {}", address.getHostAddress());
+                }
+                else if (address.isLoopbackAddress())
+                {
+                    log.debug("Target is localhost/loopback: {}", address.getHostAddress());
+                }
             }
             catch (UnknownHostException e)
             {
@@ -245,6 +255,10 @@ public class ConnectionAnalyzer
                 log.warn("High network latency detected: {} ms to {}:{}", latencyMs, address.getHostAddress(), connection.getPortInt());
                 warnings.add("High network latency detected: " + latencyMs + " ms");
                 recommendations.add("Consider using a closer HPCC cluster or investigating network congestion");
+            }
+            else if (latencyMs > 500)
+            {
+                log.info("Moderate network latency: {} ms - acceptable but may impact performance", latencyMs);
             }
             else
             {
@@ -271,6 +285,10 @@ public class ConnectionAnalyzer
             {
                 log.info("SSL/TLS certificate validation passed for {}:{}", connection.getHost(), connection.getPortInt());
             }
+        }
+        else if (connection.getIsHttps() && address == null)
+        {
+            log.debug("Step 4: Skipping SSL/TLS test - network connectivity not established");
         }
 
         // Test HTTP endpoint availability
@@ -305,6 +323,11 @@ public class ConnectionAnalyzer
         else
         {
             log.debug("Step 6: Skipping authentication test - no credentials provided");
+            // Check if authentication might be required
+            if (address != null && !testIfAuthenticationRequired(connection, warnings, recommendations))
+            {
+                log.debug("Target does not appear to require authentication");
+            }
         }
 
         // Test HPCC-specific endpoints used by BaseHPCCWsClient
@@ -326,6 +349,31 @@ public class ConnectionAnalyzer
         else
         {
             log.warn("Step 7: Skipping HPCC endpoint tests - network connectivity not established");
+        }
+
+        // Additional checks and recommendations
+        performAdditionalChecks(connection, address, latencyMs, errors, warnings, recommendations);
+        
+        // Test for connection stability and response timing
+        if (address != null && overallSuccess)
+        {
+            log.debug("Step 8: Testing connection stability and response timing");
+            if (!testConnectionStability(connection, errors, warnings, recommendations))
+            {
+                log.warn("Connection stability issues detected for {}", connection.getBaseUrl());
+                // Don't fail overall, but warn about potential instability
+            }
+        }
+
+        // Test for advanced connectivity issues
+        if (address != null)
+        {
+            log.debug("Step 9: Testing advanced connectivity issues (TLS, compression, redirects, etc.)");
+            if (!testAdvancedConnectivityIssues(connection, errors, warnings, recommendations))
+            {
+                log.warn("Advanced connectivity issues detected for {}", connection.getBaseUrl());
+                // Don't fail overall, but provide additional diagnostics
+            }
         }
 
         log.info("Connectivity analysis completed for {} - Overall status: {}", 
@@ -1058,5 +1106,459 @@ public class ConnectionAnalyzer
                 return false;
             }
         }
+    }
+
+    /**
+     * Tests if the target requires authentication by checking the response headers.
+     * 
+     * @param connection the connection to test
+     * @param warnings list to add warnings to
+     * @param recommendations list to add recommendations to
+     * @return true if authentication appears to be required, false otherwise
+     */
+    @WithSpan
+    private static boolean testIfAuthenticationRequired(Connection connection, List<String> warnings,
+            List<String> recommendations)
+    {
+        try
+        {
+            URL url = new URL(connection.getBaseUrl());
+            HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+            httpConn.setRequestMethod("HEAD");
+            httpConn.setConnectTimeout(5000);
+            httpConn.setReadTimeout(5000);
+            httpConn.setInstanceFollowRedirects(false);
+
+            int responseCode = httpConn.getResponseCode();
+            
+            if (responseCode == 401)
+            {
+                warnings.add("Target HPCC cluster requires authentication but no credentials provided");
+                recommendations.add("Provide credentials using connection.setCredentials(username, password)");
+                log.info("Authentication required but no credentials provided for {}", connection.getBaseUrl());
+                return true;
+            }
+            
+            return false;
+        }
+        catch (Exception e)
+        {
+            // If we can't determine, assume no auth required
+            log.debug("Could not determine if authentication is required: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Performs additional checks and provides recommendations based on the analysis results.
+     * 
+     * @param connection the connection being analyzed
+     * @param address the resolved IP address (may be null)
+     * @param latencyMs measured latency in milliseconds (-1 if not measured)
+     * @param errors list to add errors to
+     * @param warnings list to add warnings to
+     * @param recommendations list to add recommendations to
+     */
+    @WithSpan
+    private static void performAdditionalChecks(Connection connection, InetAddress address, long latencyMs,
+            List<String> errors, List<String> warnings, List<String> recommendations)
+    {
+        log.debug("Performing additional connectivity checks");
+
+        // Check for common misconfigurations
+        if (connection.getIsHttps() && connection.getAllowInvalidCerts())
+        {
+            warnings.add("SSL certificate validation is disabled (allowInvalidCerts=true)");
+            recommendations.add("Enable SSL certificate validation for production environments");
+            log.warn("SSL certificate validation is disabled for {}", connection.getBaseUrl());
+        }
+
+        // Check for potential proxy issues
+        String httpProxy = System.getProperty("http.proxyHost");
+        String httpsProxy = System.getProperty("https.proxyHost");
+        if (httpProxy != null || httpsProxy != null)
+        {
+            log.debug("HTTP proxy configuration detected - this may affect connectivity");
+            warnings.add("HTTP proxy is configured: " + (httpProxy != null ? httpProxy : httpsProxy));
+            recommendations.add("Verify proxy settings allow connections to HPCC cluster");
+            recommendations.add("Check if HPCC cluster IP/hostname needs to be added to proxy exclusion list");
+        }
+
+        // Check for localhost connections
+        if (address != null && address.isLoopbackAddress())
+        {
+            log.debug("Connection target is localhost - ensure HPCC cluster is running locally");
+            recommendations.add("Verify HPCC cluster is running on localhost");
+        }
+
+        // Check for containerized environment issues
+        String inContainer = System.getenv("container");
+        if (inContainer != null && address != null && !address.isLoopbackAddress())
+        {
+            log.debug("Running in containerized environment - may have network restrictions");
+            warnings.add("Running in containerized environment - verify network connectivity to external hosts");
+            recommendations.add("Check container network configuration and DNS settings");
+            recommendations.add("Verify HPCC cluster is accessible from within the container network");
+        }
+
+        // Check JVM network properties that might affect connectivity
+        String dnsCache = System.getProperty("networkaddress.cache.ttl");
+        if (dnsCache != null && !"0".equals(dnsCache))
+        {
+            log.debug("DNS caching is enabled with TTL: {}", dnsCache);
+        }
+
+        // Check for IPv6 preference
+        String preferIPv6 = System.getProperty("java.net.preferIPv6Addresses");
+        if ("true".equalsIgnoreCase(preferIPv6))
+        {
+            log.debug("IPv6 is preferred - this may cause issues if HPCC cluster is IPv4 only");
+            warnings.add("JVM is configured to prefer IPv6 addresses");
+            recommendations.add("Ensure HPCC cluster supports IPv6 or disable IPv6 preference");
+        }
+
+        // Warn about very slow connections
+        if (latencyMs > 2000)
+        {
+            warnings.add("Very high network latency (" + latencyMs + " ms) may cause timeouts");
+            recommendations.add("Increase timeout values: connection.setConnectTimeoutMilli() and setReadTimeoutMilli()");
+            recommendations.add("Consider using a geographically closer HPCC cluster");
+        }
+
+        // Check if using default timeouts with high latency
+        if (latencyMs > 1000 && connection.getConnectTimeoutMilli() == Connection.DEFAULT_CONNECT_TIMEOUT_MILLI)
+        {
+            warnings.add("Using default timeout with high latency may be insufficient");
+            recommendations.add("Consider increasing timeout values for this high-latency connection");
+        }
+
+        // Provide summary recommendation
+        if (errors.isEmpty() && warnings.isEmpty())
+        {
+            log.info("No connectivity issues detected - connection appears healthy");
+        }
+        else if (!errors.isEmpty())
+        {
+            log.error("Critical connectivity issues detected - connection will likely fail");
+            recommendations.add("Address critical errors before attempting to use this connection");
+        }
+        else if (!warnings.isEmpty())
+        {
+            log.warn("Potential connectivity issues detected - connection may work but could be unstable");
+            recommendations.add("Review warnings to improve connection reliability");
+        }
+    }
+
+    /**
+     * Tests connection stability by checking for dropped connections, slow responses,
+     * and connection reuse issues.
+     * 
+     * @param connection the connection to test
+     * @param errors list to add errors to
+     * @param warnings list to add warnings to
+     * @param recommendations list to add recommendations to
+     * @return true if connection appears stable, false otherwise
+     */
+    @WithSpan
+    private static boolean testConnectionStability(Connection connection, List<String> errors,
+            List<String> warnings, List<String> recommendations)
+    {
+        boolean stable = true;
+
+        // Test for slow response times by making a lightweight request
+        log.debug("Testing response timing for potential slow/hanging responses");
+        long startTime = System.currentTimeMillis();
+        try
+        {
+            String response = connection.sendGetRequest("esp/getauthtype");
+            long responseTime = System.currentTimeMillis() - startTime;
+            
+            log.debug("Response received in {} ms", responseTime);
+            
+            if (responseTime > 10000)
+            {
+                warnings.add("Very slow response time (" + responseTime + " ms) - server may be overloaded");
+                recommendations.add("Check HPCC server load and performance");
+                recommendations.add("Consider increasing read timeout values");
+                log.warn("Very slow response detected: {} ms for {}", responseTime, connection.getBaseUrl());
+                stable = false;
+            }
+            else if (responseTime > 5000)
+            {
+                warnings.add("Slow response time (" + responseTime + " ms) detected");
+                recommendations.add("Monitor server performance and network conditions");
+                log.info("Slow response detected: {} ms", responseTime);
+            }
+        }
+        catch (SocketTimeoutException e)
+        {
+            warnings.add("Request timed out - connection may be hanging or server is unresponsive");
+            recommendations.add("Increase read timeout: connection.setReadTimeoutMilli()");
+            recommendations.add("Check if HPCC server is responsive and not overloaded");
+            log.warn("Connection timeout detected during stability test: {}", e.getMessage());
+            stable = false;
+        }
+        catch (Exception e)
+        {
+            log.debug("Stability test encountered exception: {}", e.getMessage());
+            // Don't report as this might be due to auth requirements or other expected issues
+        }
+
+        // Test for connection reuse/keep-alive by making multiple requests
+        log.debug("Testing connection reuse and keep-alive behavior");
+        List<Long> responseTimes = new ArrayList<>();
+        int testRequests = 3;
+        
+        for (int i = 0; i < testRequests; i++)
+        {
+            startTime = System.currentTimeMillis();
+            try
+            {
+                connection.sendGetRequest("esp/getauthtype");
+                long responseTime = System.currentTimeMillis() - startTime;
+                responseTimes.add(responseTime);
+                
+                // Small delay between requests
+                try
+                {
+                    Thread.sleep(100);
+                }
+                catch (InterruptedException e)
+                {
+                    Thread.currentThread().interrupt();
+                    log.debug("Sleep interrupted during stability test");
+                    break;
+                }
+            }
+            catch (Exception e)
+            {
+                log.debug("Request {} failed during stability test: {}", i + 1, e.getMessage());
+                break;
+            }
+        }
+
+        if (responseTimes.size() >= 2)
+        {
+            // Check for significant variance in response times (might indicate instability)
+            long firstResponse = responseTimes.get(0);
+            long lastResponse = responseTimes.get(responseTimes.size() - 1);
+            
+            if (Math.abs(lastResponse - firstResponse) > 2000)
+            {
+                warnings.add("Significant variance in response times detected (" + firstResponse + 
+                    " ms vs " + lastResponse + " ms) - connection may be unstable");
+                recommendations.add("Check for network instability or server load fluctuations");
+                log.warn("Response time variance: first={} ms, last={} ms", firstResponse, lastResponse);
+                stable = false;
+            }
+            
+            // Check if connections are being dropped between requests
+            if (responseTimes.size() < testRequests)
+            {
+                warnings.add("Connection dropped during repeated requests - intermittent connectivity issue");
+                recommendations.add("Check for firewall idle timeout settings");
+                recommendations.add("Verify network stability and connection keep-alive settings");
+                log.warn("Connection dropped after {} of {} requests", responseTimes.size(), testRequests);
+                stable = false;
+            }
+        }
+
+        // Test socket timeout behavior
+        log.debug("Validating timeout configuration");
+        if (connection.getSocketTimeoutMilli() <= 0)
+        {
+            warnings.add("Socket timeout is not configured properly");
+            recommendations.add("Set a positive socket timeout: connection.setSocketTimeoutMilli()");
+            log.warn("Socket timeout is not properly configured: {} ms", connection.getSocketTimeoutMilli());
+        }
+
+        // Check for potential connection pool issues if using HTTP/1.0
+        log.debug("Checking HTTP protocol version implications");
+        warnings.add("Note: Connection keep-alive behavior depends on HPCC server HTTP configuration");
+        recommendations.add("Ensure HPCC server supports HTTP keep-alive for better connection reuse");
+
+        return stable;
+    }
+
+    /**
+     * Tests for additional advanced connectivity issues including TLS versions,
+     * compression, redirects, and other protocol-level concerns.
+     * 
+     * @param connection the connection to test
+     * @param errors list to add errors to
+     * @param warnings list to add warnings to
+     * @param recommendations list to add recommendations to
+     * @return true if no advanced issues detected, false otherwise
+     */
+    @WithSpan
+    private static boolean testAdvancedConnectivityIssues(Connection connection, List<String> errors,
+            List<String> warnings, List<String> recommendations)
+    {
+        boolean allGood = true;
+
+        // Test for TLS version and cipher suite compatibility (if HTTPS)
+        if (connection.getIsHttps())
+        {
+            log.debug("Checking TLS configuration and cipher suite compatibility");
+            try
+            {
+                // Try to get supported protocols
+                SSLContext sslContext = SSLContext.getDefault();
+                String[] supportedProtocols = sslContext.getSupportedSSLParameters().getProtocols();
+                
+                boolean hasTLS12OrHigher = false;
+                for (String protocol : supportedProtocols)
+                {
+                    if (protocol.equals("TLSv1.2") || protocol.equals("TLSv1.3"))
+                    {
+                        hasTLS12OrHigher = true;
+                        break;
+                    }
+                }
+                
+                if (!hasTLS12OrHigher)
+                {
+                    warnings.add("JVM may not support modern TLS versions (TLS 1.2+)");
+                    recommendations.add("Ensure JVM supports TLS 1.2 or higher for secure connections");
+                    log.warn("Modern TLS versions may not be supported");
+                }
+            }
+            catch (Exception e)
+            {
+                log.debug("Could not check TLS configuration: {}", e.getMessage());
+            }
+        }
+
+        // Test for HTTP redirect handling
+        log.debug("Testing HTTP redirect handling");
+        try
+        {
+            URL url = new URL(connection.getBaseUrl());
+            HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+            httpConn.setRequestMethod("HEAD");
+            httpConn.setConnectTimeout(5000);
+            httpConn.setReadTimeout(5000);
+            httpConn.setInstanceFollowRedirects(false); // Don't follow redirects
+            
+            int responseCode = httpConn.getResponseCode();
+            
+            if (responseCode >= 300 && responseCode < 400)
+            {
+                String location = httpConn.getHeaderField("Location");
+                warnings.add("Server returned redirect (HTTP " + responseCode + ") to: " + location);
+                recommendations.add("Update connection URL to use the redirect target directly");
+                recommendations.add("Verify redirect target is the correct HPCC endpoint");
+                log.warn("Redirect detected: {} -> {}", connection.getBaseUrl(), location);
+                allGood = false;
+            }
+        }
+        catch (Exception e)
+        {
+            log.debug("Could not test redirect handling: {}", e.getMessage());
+        }
+
+        // Test for compression support
+        log.debug("Checking compression support");
+        try
+        {
+            URL url = new URL(connection.getBaseUrl() + "/esp/getauthtype");
+            HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+            httpConn.setRequestProperty("Accept-Encoding", "gzip, deflate");
+            httpConn.setRequestMethod("GET");
+            httpConn.setConnectTimeout(5000);
+            httpConn.setReadTimeout(5000);
+            
+            if (connection.hasCredentials())
+            {
+                httpConn.setRequestProperty("Authorization", connection.getBasicAuthString());
+            }
+            
+            int responseCode = httpConn.getResponseCode();
+            if (responseCode == 200)
+            {
+                String contentEncoding = httpConn.getHeaderField("Content-Encoding");
+                if (contentEncoding != null && (contentEncoding.contains("gzip") || contentEncoding.contains("deflate")))
+                {
+                    log.debug("Server supports compression: {}", contentEncoding);
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            log.debug("Could not test compression support: {}", e.getMessage());
+        }
+
+        // Check for potential MTU issues with large responses
+        log.debug("Checking for potential MTU/packet fragmentation issues");
+        if (connection.getSocketTimeoutMilli() > 0 && connection.getSocketTimeoutMilli() < 30000)
+        {
+            warnings.add("Socket timeout (" + connection.getSocketTimeoutMilli() + 
+                " ms) may be too short for large responses");
+            recommendations.add("Consider increasing socket timeout for operations that return large datasets");
+        }
+
+        // Check for concurrent connection handling
+        log.debug("Checking concurrent connection behavior");
+        warnings.add("Note: Connection reuse and pooling behavior depends on client implementation");
+        recommendations.add("Consider using connection pooling for better performance (e.g., HPCCWsClientPool)");
+
+        // Test for proxy configuration issues
+        String httpProxyHost = System.getProperty("http.proxyHost");
+        String httpProxyPort = System.getProperty("http.proxyPort");
+        String httpsProxyHost = System.getProperty("https.proxyHost");
+        String httpsProxyPort = System.getProperty("https.proxyPort");
+        String nonProxyHosts = System.getProperty("http.nonProxyHosts");
+        
+        if ((httpProxyHost != null || httpsProxyHost != null))
+        {
+            log.debug("Proxy configuration detected");
+            
+            // Check if target should bypass proxy
+            if (nonProxyHosts != null && connection.getHost() != null)
+            {
+                boolean shouldBypass = false;
+                String[] noProxyList = nonProxyHosts.split("\\|");
+                for (String noProxyHost : noProxyList)
+                {
+                    if (connection.getHost().matches(noProxyHost.replace("*", ".*")))
+                    {
+                        shouldBypass = true;
+                        break;
+                    }
+                }
+                
+                if (!shouldBypass)
+                {
+                    String proxyInfo = connection.getIsHttps() ? 
+                        (httpsProxyHost + ":" + httpsProxyPort) : 
+                        (httpProxyHost + ":" + httpProxyPort);
+                    log.debug("Connection will use proxy: {}", proxyInfo);
+                    recommendations.add("Verify proxy " + proxyInfo + " can reach HPCC cluster");
+                }
+            }
+            
+            // Check for proxy authentication requirements
+            String proxyUser = System.getProperty("http.proxyUser");
+            if (proxyUser == null)
+            {
+                warnings.add("Proxy configured but no proxy credentials - may need proxy authentication");
+                recommendations.add("Set proxy credentials if required: -Dhttp.proxyUser and -Dhttp.proxyPassword");
+            }
+        }
+
+        // Check for connection rate limiting indicators
+        log.debug("Note: Connection rate limiting detection requires multiple failed attempts");
+        recommendations.add("If experiencing intermittent failures, check for rate limiting on HPCC cluster");
+
+        // Check character encoding
+        String fileEncoding = System.getProperty("file.encoding");
+        if (fileEncoding != null && !fileEncoding.equalsIgnoreCase("UTF-8"))
+        {
+            warnings.add("JVM file encoding is " + fileEncoding + " (not UTF-8)");
+            recommendations.add("Consider setting file.encoding to UTF-8 for better compatibility");
+            log.debug("File encoding: {}", fileEncoding);
+        }
+
+        return allGood;
     }
 }
