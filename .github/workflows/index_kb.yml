@@ -13,9 +13,11 @@ jobs:
   build_index:
     runs-on: ubuntu-latest
     env:
-      PROJECT_CONFIG: '{}'                 # avoid JSON decode errors in inherited steps
-      ANONYMIZED_TELEMETRY: 'False'       # reduce noisy telemetry
+      PROJECT_CONFIG: '{}'                       # avoid JSON decode errors in inherited steps
+      # Quiet telemetry (env approach). Also consider disabling in code via Chroma Settings.
+      ANONYMIZED_TELEMETRY: 'false'
       CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
+      CHROMA_ANONYMIZED_TELEMETRY: 'false'
     steps:
       - name: Setup Python early
         uses: actions/setup-python@v5
@@ -29,6 +31,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r .github/scripts/requirements-rag.txt -c .github/scripts/constraints-rag.txt
+          pip check
 
       - name: Build KB index (HF embeddings)
         env:
@@ -40,12 +43,15 @@ jobs:
         run: |
           echo "Listing .kb_index:"
           ls -la .kb_index || true
-          echo "Tree:"
-          find .kb_index -type f -maxdepth 2 -print || true
+          echo "Tree (maxdepth=2):"
+          find .kb_index -maxdepth 2 -type f -print || true
 
       - name: Upload KB index artifact
         uses: actions/upload-artifact@v4
         with:
           name: kb-index
-          path: .kb_index
+          # Use explicit relative glob + allow hidden-folder upload
+          path: ./.kb_index/**
+          include-hidden-files: true
           if-no-files-found: error
+          retention-days: 14
