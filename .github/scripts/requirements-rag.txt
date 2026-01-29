@@ -1,6 +1,6 @@
-langchain
-langchain-community
-langchain-text-splitter
-chromadb
-tiktoken
-sentence-transformers
+langchain==0.2.*
+langchain-community==0.2.*
+langchain-text-splitters==0.2.*
+chromadb==0.5.*
+tiktoken>=0.7.0
+sentence-transformers>=2.2.2
