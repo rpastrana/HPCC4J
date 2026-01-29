@@ -7,9 +7,10 @@ import os
 from glob import glob
 from typing import Iterator, Tuple
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
+
 
 KB_DIR = os.environ.get("KB_DIR", "kb")
 DB_DIR = os.environ.get("KB_DB_DIR", ".kb_index")
