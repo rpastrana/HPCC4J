@@ -1,0 +1,90 @@
+name: Ask KB (RAG Agent - Local HF)
+
+on:
+  workflow_dispatch:
+    inputs:
+      question:
+        description: "Your question for the KB RAG agent"
+        type: string
+        required: true
+      llm_model:
+        description: "HuggingFace LLM model"
+        type: string
+        default: microsoft/Phi-2
+      embed_model:
+        description: "Embedding model"
+        type: string
+        default: sentence-transformers/all-MiniLM-L6-v2
+      retriever_k:
+        type: string
+        default: "6"
+      fetch_k:
+        type: string
+        default: "20"
+      temperature:
+        type: string
+        default: "0.2"
+      rebuild_index:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  run_agent:
+    runs-on: ubuntu-latest
+
+    env:
+      ANONYMIZED_TELEMETRY: 'false'
+      CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
+      KB_DIR: kb
+      KB_DB_DIR: .kb_index
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r .github/scripts/requirements-rag.txt -c .github/scripts/constraints-rag.txt
+          pip install transformers accelerate
+
+      - name: Cache KB index
+        id: cache-index
+        uses: actions/cache@v4
+        with:
+          path: .kb_index
+          key: kb-index-${{ hashFiles('kb/**') }}
+          restore-keys: |
+            kb-index-
+
+      - name: Build KB index (if missing or forced)
+        if: inputs.rebuild_index == true || steps.cache-index.outputs.cache-hit != 'true'
+        env:
+          KB_EMBED_MODEL: ${{ inputs.embed_model }}
+        run: python .github/scripts/kb_index.py
+
+      - name: Run RAG agent (local HF model)
+        env:
+          KB_DB_DIR: .kb_index
+          KB_EMBED_MODEL: ${{ inputs.embed_model }}
+          KB_RETRIEVER_K: ${{ inputs.retriever_k }}
+          KB_RETRIEVER_FETCH_K: ${{ inputs.fetch_k }}
+          LLM_MODEL: ${{ inputs.llm_model }}
+          LLM_TEMPERATURE: ${{ inputs.temperature }}
+        run: |
+          echo "Q: ${{ inputs.question }}" | tee question.txt
+          python .github/scripts/rag_agent.py "${{ inputs.question }}" | tee rag_answer.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rag-answer
+          path: |
+            rag_answer.txt
+            question.txt
+``
