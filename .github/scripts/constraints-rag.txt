@@ -1,0 +1,3 @@
+
+# constraints-rag.txt (for 0.2.x track)
+langchain-core==0.2.43
