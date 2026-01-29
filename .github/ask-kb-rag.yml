@@ -1,0 +1,160 @@
+name: Ask KB (RAG Agent)
+
+on:
+  workflow_dispatch:
+    inputs:
+      question:
+        description: "Your question for the KB RAG agent"
+        type: string
+        required: true
+      llm_provider:
+        description: "LLM provider (openai or azure)"
+        type: choice
+        options: [openai, azure]
+        default: openai
+      openai_model:
+        description: "OpenAI model (used if provider=openai)"
+        type: string
+        default: gpt-4o-mini
+      temperature:
+        description: "LLM temperature (0–1)"
+        type: string
+        default: "0.2"
+      retriever_k:
+        description: "Retriever top-k (final)"
+        type: string
+        default: "6"
+      fetch_k:
+        description: "Retriever fetch_k (pool before MMR)"
+        type: string
+        default: "20"
+      embed_model:
+        description: "Embedding model used for both index & agent"
+        type: string
+        default: sentence-transformers/all-MiniLM-L6-v2
+      rebuild_index:
+        description: "Force rebuilding the KB index this run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ask-kb-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  run_agent:
+    runs-on: ubuntu-latest
+    env:
+      # Telemetry off (also disabled in kb_index.py):
+      ANONYMIZED_TELEMETRY: 'false'
+      CHROMA_ANONYMIZED_TELEMETRY: 'false'
+      CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
+      # Shared paths / defaults:
+      KB_DIR: kb
+      KB_DB_DIR: .kb_index
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache pip
+        id: cache-pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/scripts/requirements-rag.txt', '.github/scripts/constraints-rag.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r .github/scripts/requirements-rag.txt -c .github/scripts/constraints-rag.txt
+          pip check
+
+      # Re-use the KB index via cache. If miss (or rebuild requested), we'll build it.
+      - name: Cache KB index
+        id: cache-index
+        uses: actions/cache@v4
+        with:
+          path: .kb_index
+          key: |
+            ${{ runner.os }}-kb-index-${{ hashFiles('kb/**', '.github/scripts/requirements-rag.txt', '.github/scripts/constraints-rag.txt') }}-${{ inputs.embed_model }}
+          restore-keys: |
+            ${{ runner.os }}-kb-index-
+
+      - name: Build KB index (if missing or forced)
+        if: inputs.rebuild_index == true || steps.cache-index.outputs.cache-hit != 'true'
+        env:
+          KB_EMBED_MODEL: ${{ inputs.embed_model }}
+          KB_DB_DIR: .kb_index
+          KB_DIR: kb
+        run: |
+          echo "Building KB index (reason: ${{ inputs.rebuild_index && 'forced' || 'cache-miss' }})..."
+          python .github/scripts/kb_index.py
+
+      - name: Sanity check KB index
+        run: |
+          echo "Listing ${KB_DB_DIR}:"
+          ls -la "${KB_DB_DIR}" || (echo "ERROR: index directory not found (${KB_DB_DIR})" && exit 2)
+          echo "Tree (depth=2):"
+          find "${KB_DB_DIR}" -maxdepth 2 -type f -print || true
+
+      - name: Run RAG agent
+        env:
+          # Agent config
+          KB_DB_DIR: .kb_index
+          KB_EMBED_MODEL: ${{ inputs.embed_model }}
+          KB_RETRIEVER_K: ${{ inputs.retriever_k }}
+          KB_RETRIEVER_FETCH_K: ${{ inputs.fetch_k }}
+          LLM_PROVIDER: ${{ inputs.llm_provider }}
+          OPENAI_MODEL: ${{ inputs.openai_model }}
+          LLM_TEMPERATURE: ${{ inputs.temperature }}
+          # OpenAI
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Azure OpenAI (only used if llm_provider=azure)
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Question: ${{ inputs.question }}" | tee question.txt
+          python .github/scripts/rag_agent.py "${{ inputs.question }}" | tee rag_answer.txt
+
+      - name: Upload answer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-answer-${{ github.run_number }}
+          path: |
+            question.txt
+            rag_answer.txt
+          retention-days: 14
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## RAG Agent Result"
+            echo ""
+            echo "**Question**"
+            echo ""
+            echo "\`\`\`"
+            cat question.txt
+            echo "\`\`\`"
+            echo ""
+            echo "**Answer**"
+            echo ""
+            echo "\`\`\`"
+            cat rag_answer.txt
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
