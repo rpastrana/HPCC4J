@@ -1,7 +1,7 @@
 langchain==0.2.17
 langchain-community==0.2.17
 langchain-text-splitters==0.2.0
-langchain-huggingface==0.0.3    # any 0.0.x compatible with core <0.3
+langchain-huggingface==0.0.3
 chromadb==0.5.4
 tiktoken==0.7.0
-sentence-transformers==2.2.2
+sentence-transformers==2.6.1     # >= 2.6.0 to satisfy huggingface 0.0.3
