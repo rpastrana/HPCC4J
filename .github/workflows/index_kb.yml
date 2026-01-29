@@ -2,6 +2,7 @@
 name: Index KB (RAG)
 
 on:
+  workflow_dispatch: {}   # <-- add this line to allow manual runs
   push:
     paths:
       - 'kb/**'
