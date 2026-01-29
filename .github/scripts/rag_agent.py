@@ -1,27 +1,60 @@
 #!/usr/bin/env python3
 # .github/scripts/rag_agent.py
-# Simple RAG agent that consumes a persisted Chroma index and answers with citations.
+# RAG agent that consumes a persisted Chroma index and answers with citations.
+# - No API keys required (local HuggingFace Transformers model).
+# - Compatible with LangChain 0.2.x and 0.3.x.
+#
+# Usage:
+#   python .github/scripts/rag_agent.py "your question here"
+#   # or interactive:
+#   python .github/scripts/rag_agent.py
+#
+# Environment variables (defaults shown):
+#   KB_DB_DIR=".kb_index"                   # persisted Chroma directory
+#   KB_EMBED_MODEL="sentence-transformers/all-MiniLM-L6-v2"
+#   KB_COLLECTION_NAME="hpcckb"
+#   KB_RETRIEVER_K="6"
+#   KB_RETRIEVER_FETCH_K="20"
+#   LLM_MODEL="TinyLlama/TinyLlama-1.1B-Chat-v1.0"   # small CPU-friendly default
+#   LLM_TEMPERATURE="0.2"
+#
+# Optional performance tuning:
+#   HF_HOME=...                             # HuggingFace cache directory
+#   TRANSFORMERS_CACHE=...                  # model cache directory
 
 import os
 import sys
 from typing import List
 
-# --- LangChain imports (support both 0.2.x and 0.3.x lines) ---
+# -------- LangChain core imports with compatibility for 0.2.x / 0.3.x --------
 try:
-    # 0.3.x
+    # LangChain 0.3.x
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
     from langchain_core.runnables import RunnablePassthrough
-except ImportError:
-    # 0.2.x
-    from langchain.prompts import ChatPromptTemplate
-    from langchain.schema.output_parser import StrOutputParser
-    from langchain.schema.runnable import RunnablePassthrough
+except Exception:
+    # LangChain 0.2.x fallbacks
+    try:
+        from langchain.prompts import ChatPromptTemplate  # type: ignore
+    except Exception:
+        raise ImportError("LangChain prompts not found. Ensure langchain is installed.")
+    try:
+        from langchain_core.output_parsers import StrOutputParser  # type: ignore
+    except Exception:
+        # Older fallback
+        from langchain.schema.output_parser import StrOutputParser  # type: ignore
+    try:
+        from langchain_core.runnables import RunnablePassthrough  # type: ignore
+    except Exception:
+        from langchain.schema.runnable import RunnablePassthrough  # type: ignore
 
+# Vector store + embeddings
 from langchain_community.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
 
+# Local LLM (Transformers)
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 # -------------------------
 # Configuration (env-driven)
@@ -31,35 +64,33 @@ DB_DIR = os.environ.get("KB_DB_DIR", ".kb_index")
 EMBED_MODEL = os.environ.get("KB_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 COLLECTION = os.environ.get("KB_COLLECTION_NAME", "hpcckb")
 
-# Retrieval knobs
 RETRIEVER_K = int(os.environ.get("KB_RETRIEVER_K", "6"))
 RETRIEVER_FETCH_K = int(os.environ.get("KB_RETRIEVER_FETCH_K", "20"))
 
-# LLM selection
-LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "openai").lower()  # 'openai' or 'azure'
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")     # cost-friendly default
-TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
+LLM_MODEL = os.environ.get("LLM_MODEL", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
 
-# Azure OpenAI envs (if you choose provider=azure)
-# AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT
+# Quiet Chroma telemetry (belt & suspenders with your workflow env)
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
+os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "false")
+os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
 
 
-# ------------------------------------
-# Build retriever over persisted index
-# ------------------------------------
+# -------------------------
+# Retriever over Chroma
+# -------------------------
 
 def build_retriever():
-    # Use the SAME embedding model you used during indexing
+    # Use the SAME embedding model as the index
     embeddings = HuggingFaceEmbeddings(model_name=EMBED_MODEL)
 
-    # Load persisted vector store
     db = Chroma(
         collection_name=COLLECTION,
         embedding_function=embeddings,
         persist_directory=DB_DIR,
     )
 
-    # MMR retrieval (diverse context)
+    # MMR for diversity (helps avoid redundant chunks)
     retriever = db.as_retriever(
         search_type="mmr",
         search_kwargs={"k": RETRIEVER_K, "fetch_k": RETRIEVER_FETCH_K}
@@ -68,7 +99,7 @@ def build_retriever():
 
 
 def format_docs(docs) -> str:
-    """Turn retrieved docs into a single string with clear source tags."""
+    """Concatenate retrieved docs with inline source and chunk id markers."""
     lines: List[str] = []
     for d in docs:
         src = d.metadata.get("source", "unknown")
@@ -78,113 +109,15 @@ def format_docs(docs) -> str:
 
 
 # -------------------------
-# LLM setup
+# Local HF LLM (no API keys)
 # -------------------------
+
+def _select_dtype() -> torch.dtype:
+    if torch.cuda.is_available():
+        return torch.float16
+    # bfloat16 can be faster on some CPUs supporting AVX512/BF16, but float32 is safest
+    return torch.float32
 
 def build_llm():
-    if LLM_PROVIDER == "azure":
-        # Requires: AZURE_OPENAI_* env vars + a deployment name
-        deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", OPENAI_MODEL)
-        return AzureChatOpenAI(
-            azure_deployment=deployment,
-            temperature=TEMPERATURE,
-            timeout=60,
-        )
-    # Default: OpenAI
-    return ChatOpenAI(
-        model=OPENAI_MODEL,
-        temperature=TEMPERATURE,
-        timeout=60,
-    )
-
-
-# -------------------------
-# Prompt (grounded, with citations)
-# -------------------------
-
-PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            "You are an HPCC Systems assistant. Answer using ONLY the provided context. "
-            "If the answer is not in the context, say you don't know. "
-            "Cite sources inline like (source: <path>) and include a final 'Sources' section "
-            "listing the unique file paths you used.",
-        ),
-        (
-            "human",
-            "Question:\n{question}\n\n"
-            "Context:\n{context}\n\n"
-            "Answer:"
-        ),
-    ]
-)
-
-
-# -------------------------
-# Build the RAG chain (LCEL)
-# -------------------------
-
-def build_chain():
-    retriever = build_retriever()
-    llm = build_llm()
-
-    chain = {
-        "context": retriever | format_docs,
-        "question": RunnablePassthrough(),
-    } | PROMPT | llm | StrOutputParser()
-
-    return chain, retriever
-
-
-# -------------------------
-# CLI entrypoints
-# -------------------------
-
-def answer_question(q: str):
-    chain, retriever = build_chain()
-    # Grab the top docs (for separate source printing, optional)
-    docs = retriever.invoke(q)
-    answer = chain.invoke(q)
-
-    # Extract and print unique sources from retrieved docs
-    unique_sources = []
-    for d in docs:
-        src = d.metadata.get("source")
-        if src and src not in unique_sources:
-            unique_sources.append(src)
-
-    print("\n=== Answer ===\n")
-    print(answer.strip())
-    print("\n--- Top sources (retrieved) ---")
-    for s in unique_sources:
-        print(s)
-
-
-def main():
-    if not os.path.isdir(DB_DIR):
-        print(f"ERROR: Persisted index directory not found: {DB_DIR}", file=sys.stderr)
-        sys.exit(2)
-
-    if len(sys.argv) > 1:
-        question = " ".join(sys.argv[1:]).strip()
-        if not question:
-            print("Provide a non-empty question.")
-            sys.exit(1)
-        answer_question(question)
-        return
-
-    # Interactive mode
-    print("RAG Agent (HPCC KB). Type 'exit' to quit.\n")
-    while True:
-        try:
-            q = input("> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            break
-        if not q or q.lower() in {"exit", "quit"}:
-            break
-        answer_question(q)
-
-if __name__ == "__main__":
-    main()
+    """
+    Build a local HuggingFace text-generation pipeline and wrap it with LangChain.
