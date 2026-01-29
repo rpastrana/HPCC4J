@@ -1,12 +1,7 @@
-# Core LangChain split packages (pin to matching minor to keep resolver happy)
 langchain==0.2.17
 langchain-community==0.2.17
 langchain-text-splitters==0.2.0
-langchain-huggingface==0.1.2
-
-# Vector store + tokenization
+langchain-huggingface==0.0.3    # any 0.0.x compatible with core <0.3
 chromadb==0.5.4
 tiktoken==0.7.0
-
-# Embedding model runtime
 sentence-transformers==2.2.2
