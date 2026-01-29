@@ -8,66 +8,116 @@ on:
         type: string
         required: true
       llm_model:
-        description: "HuggingFace LLM model"
+        description: "HuggingFace LLM model (small + instruct-tuned recommended)"
         type: string
-        default: microsoft/Phi-2
+        default: TinyLlama/TinyLlama-1.1B-Chat-v1.0
       embed_model:
         description: "Embedding model"
         type: string
         default: sentence-transformers/all-MiniLM-L6-v2
       retriever_k:
+        description: "Retriever top-k (final)"
         type: string
-        default: "6"
+        default: "4"
       fetch_k:
+        description: "Retriever fetch_k (pool before MMR)"
         type: string
-        default: "20"
+        default: "12"
       temperature:
+        description: "LLM temperature (0–1)"
         type: string
         default: "0.2"
+      max_new_tokens:
+        description: "Max new tokens to generate"
+        type: string
+        default: "128"
       rebuild_index:
+        description: "Force rebuilding the KB index this run"
         type: boolean
         default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: ask-kb-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   run_agent:
     runs-on: ubuntu-latest
-
     env:
+      # Telemetry off (also disabled in kb_index.py):
       ANONYMIZED_TELEMETRY: 'false'
+      CHROMA_ANONYMIZED_TELEMETRY: 'false'
       CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
+      # Shared paths / defaults:
       KB_DIR: kb
       KB_DB_DIR: .kb_index
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('.github/scripts/requirements-rag.txt', '.github/scripts/constraints-rag.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip wheel
+          python -m pip install -U pip wheel
           pip install -r .github/scripts/requirements-rag.txt -c .github/scripts/constraints-rag.txt
           pip install transformers accelerate
+          pip check
+
+      - name: Syntax check rag_agent.py
+        run: python -m py_compile .github/scripts/rag_agent.py
+
+      - name: Cache Hugging Face models (big speedup on repeat runs)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/huggingface
+            ~/.cache/torch
+          key: hf-${{ runner.os }}-${{ inputs.llm_model }}
+          restore-keys: |
+            hf-${{ runner.os }}-
 
       - name: Cache KB index
         id: cache-index
         uses: actions/cache@v4
         with:
           path: .kb_index
-          key: kb-index-${{ hashFiles('kb/**') }}
+          key: |
+            kb-index-${{ runner.os }}-${{ hashFiles('kb/**', '.github/scripts/requirements-rag.txt', '.github/scripts/constraints-rag.txt') }}-${{ inputs.embed_model }}
           restore-keys: |
-            kb-index-
+            kb-index-${{ runner.os }}-
 
       - name: Build KB index (if missing or forced)
         if: inputs.rebuild_index == true || steps.cache-index.outputs.cache-hit != 'true'
         env:
           KB_EMBED_MODEL: ${{ inputs.embed_model }}
-        run: python .github/scripts/kb_index.py
+          KB_DB_DIR: .kb_index
+          KB_DIR: kb
+        run: |
+          echo "Building KB index (reason: ${{ inputs.rebuild_index && 'forced' || 'cache-miss' }})..."
+          python .github/scripts/kb_index.py
+
+      - name: Sanity check KB index
+        run: |
+          echo "Listing ${KB_DB_DIR}:"
+          ls -la "${KB_DB_DIR}" || (echo "ERROR: index directory not found (${KB_DB_DIR})" && exit 2)
+          echo "Tree (depth=2):"
+          find "${KB_DB_DIR}" -maxdepth 2 -type f -print || true
 
       - name: Run RAG agent (local HF model)
         env:
@@ -77,13 +127,35 @@ jobs:
           KB_RETRIEVER_FETCH_K: ${{ inputs.fetch_k }}
           LLM_MODEL: ${{ inputs.llm_model }}
           LLM_TEMPERATURE: ${{ inputs.temperature }}
+          MAX_NEW_TOKENS: ${{ inputs.max_new_tokens }}
         run: |
           echo "Q: ${{ inputs.question }}" | tee question.txt
           python .github/scripts/rag_agent.py "${{ inputs.question }}" | tee rag_answer.txt
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload answer artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: rag-answer
+          name: rag-answer-${{ github.run_number }}
           path: |
-            rag_answer.txt
             question.txt
+            rag_answer.txt
+          retention-days: 14
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## RAG Agent Result"
+            echo ""
+            echo "**Question**"
+            echo ""
+            echo "\`\`\`"
+            cat question.txt
+            echo "\`\`\`"
+            echo ""
+            echo "**Answer**"
+            echo ""
+            echo "\`\`\`"
+            cat rag_answer.txt
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
