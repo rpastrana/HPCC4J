@@ -13,14 +13,16 @@
 #   KB_DB_DIR=".kb_index"                   # persisted Chroma directory
 #   KB_EMBED_MODEL="sentence-transformers/all-MiniLM-L6-v2"
 #   KB_COLLECTION_NAME="hpcckb"
-#   KB_RETRIEVER_K="6"
-#   KB_RETRIEVER_FETCH_K="20"
+#   KB_RETRIEVER_K="4"
+#   KB_RETRIEVER_FETCH_K="12"
 #   LLM_MODEL="TinyLlama/TinyLlama-1.1B-Chat-v1.0"   # small CPU-friendly default
 #   LLM_TEMPERATURE="0.2"
+#   MAX_NEW_TOKENS="128"
 #
 # Optional performance tuning:
 #   HF_HOME=...                             # HuggingFace cache directory
 #   TRANSFORMERS_CACHE=...                  # model cache directory
+#   TRUST_REMOTE_CODE="true"                # only if needed by a model you trust
 
 import os
 import sys
@@ -55,7 +57,6 @@ from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-
 # -------------------------
 # Configuration (env-driven)
 # -------------------------
@@ -64,17 +65,17 @@ DB_DIR = os.environ.get("KB_DB_DIR", ".kb_index")
 EMBED_MODEL = os.environ.get("KB_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 COLLECTION = os.environ.get("KB_COLLECTION_NAME", "hpcckb")
 
-RETRIEVER_K = int(os.environ.get("KB_RETRIEVER_K", "6"))
-RETRIEVER_FETCH_K = int(os.environ.get("KB_RETRIEVER_FETCH_K", "20"))
+RETRIEVER_K = int(os.environ.get("KB_RETRIEVER_K", "4"))
+RETRIEVER_FETCH_K = int(os.environ.get("KB_RETRIEVER_FETCH_K", "12"))
 
 LLM_MODEL = os.environ.get("LLM_MODEL", "TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "128"))
 
 # Quiet Chroma telemetry (belt & suspenders with your workflow env)
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
 os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "false")
 os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
-
 
 # -------------------------
 # Retriever over Chroma
@@ -107,7 +108,6 @@ def format_docs(docs) -> str:
         lines.append(f"[Source: {src} | chunk {chunk_i}]\n{d.page_content}\n")
     return "\n---\n".join(lines)
 
-
 # -------------------------
 # Local HF LLM (no API keys)
 # -------------------------
@@ -118,19 +118,16 @@ def _select_dtype() -> torch.dtype:
     # bfloat16 can be faster on some CPUs supporting AVX512/BF16, but float32 is safest
     return torch.float32
 
-
-def build_llm():
+def build_llm_pipeline():
     """
     Build a local HuggingFace text-generation pipeline and wrap it with LangChain.
     Defaults to a very small chat model to keep CPU inference feasible on GitHub runners.
-    You can override via LLM_MODEL env var (e.g., 'microsoft/Phi-2' or 'Qwen/Qwen2.5-1.5B-Instruct').
+    You can override via LLM_MODEL env var (e.g., 'Qwen/Qwen2.5-1.5B-Instruct' or 'microsoft/Phi-2').
     """
     print(f"Loading local HF model: {LLM_MODEL}")
     dtype = _select_dtype()
     device = 0 if torch.cuda.is_available() else -1  # -1 = CPU
 
-    # Some small instruct-tuned models may require trust_remote_code=True for custom generation heads.
-    # Keep False by default for safety; set env TRUST_REMOTE_CODE=true to enable if needed.
     trust_remote_code = os.environ.get("TRUST_REMOTE_CODE", "false").lower() == "true"
 
     tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL, trust_remote_code=trust_remote_code)
@@ -145,10 +142,10 @@ def build_llm():
         "text-generation",
         model=model,
         tokenizer=tokenizer,
-        max_new_tokens=512,
+        max_new_tokens=MAX_NEW_TOKENS,   # keep small for CPU speed
         temperature=LLM_TEMPERATURE,
         do_sample=LLM_TEMPERATURE > 0,
-        top_p=0.95,
+        top_p=0.9,
         repetition_penalty=1.05,
         pad_token_id=tokenizer.eos_token_id if tokenizer.eos_token_id is not None else None,
         device=device,
@@ -156,29 +153,43 @@ def build_llm():
 
     return HuggingFacePipeline(pipeline=gen_pipe)
 
+# -------------------------
+# Chat template wrapping
+# -------------------------
+
+def apply_chat_template(question: str, context: str) -> str:
+    """
+    Wraps the prompt in a simple chat-like template that instruction-tuned small models
+    (TinyLlama, Qwen 1.5B Instruct, Phi-2 with proper prompting) can follow.
+    """
+    return (
+        "<|system|>\n"
+        "You are an HPCC Systems expert. Use ONLY the provided context to answer. "
+        "If the answer is not in the context, say you don't know. "
+        "Cite sources inline like (source: <path>) and end with a 'Sources' section "
+        "listing the unique file paths used.\n"
+        "<|user|>\n"
+        f"Question:\n{question}\n\n"
+        f"Context:\n{context}\n\n"
+        "Provide a concise, actionable answer with citations.\n"
+        "<|assistant|>\n"
+    )
 
 # -------------------------
-# Grounded prompt (citations)
+# Prompt (kept for LCEL compatibility; we will render to a string)
 # -------------------------
 
 PROMPT = ChatPromptTemplate.from_messages(
     [
-        (
-            "system",
-            "You are an HPCC Systems expert. Use ONLY the provided context to answer. "
-            "If the answer is not in the context, say you don't know. "
-            "Cite sources inline like (source: <path>) and end with a 'Sources' section "
-            "listing the unique file paths used."
-        ),
-        (
-            "human",
-            "Question:\n{question}\n\n"
-            "Context:\n{context}\n\n"
-            "Provide a concise, actionable answer with citations."
-        ),
+        ("system",
+         "You are an HPCC Systems expert. Use ONLY the provided context to answer. "
+         "If the answer is not in the context, say you don't know. "
+         "Cite sources inline like (source: <path>) and end with a 'Sources' section "
+         "listing the unique file paths used."),
+        ("human",
+         "Question:\n{question}\n\nContext:\n{context}\n\nProvide a concise, actionable answer with citations.")
     ]
 )
-
 
 # -------------------------
 # Build the RAG chain
@@ -186,15 +197,18 @@ PROMPT = ChatPromptTemplate.from_messages(
 
 def build_chain():
     retriever = build_retriever()
-    llm = build_llm()
+    # NOTE: For small local models, we generate a single string input with our chat template.
+    llm = build_llm_pipeline()
+
+    def prompt_join(inputs: dict) -> str:
+        return apply_chat_template(inputs["question"], inputs["context"])
 
     chain = {
         "context": retriever | format_docs,
         "question": RunnablePassthrough(),
-    } | PROMPT | llm | StrOutputParser()
+    } | prompt_join | llm | StrOutputParser()
 
     return chain, retriever
-
 
 # -------------------------
 # CLI helpers
@@ -218,7 +232,6 @@ def answer_question(q: str):
         print("\n--- Top sources (retrieved) ---")
         for s in unique_sources:
             print(s)
-
 
 def main():
     if not os.path.isdir(DB_DIR):
@@ -244,7 +257,6 @@ def main():
         if not q or q.lower() in {"exit", "quit"}:
             break
         answer_question(q)
-
 
 if __name__ == "__main__":
     main()
