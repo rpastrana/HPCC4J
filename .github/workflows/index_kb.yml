@@ -1,8 +1,7 @@
-
 name: Index KB (RAG)
 
 on:
-  workflow_dispatch: {}   # <-- add this line to allow manual runs
+  workflow_dispatch: {}
   push:
     paths:
       - 'kb/**'
@@ -13,14 +12,18 @@ on:
 jobs:
   build_index:
     runs-on: ubuntu-latest
+    env:
+      PROJECT_CONFIG: '{}'                 # avoid JSON decode errors in inherited steps
+      ANONYMIZED_TELEMETRY: 'False'       # reduce noisy telemetry
+      CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
+      - name: Setup Python early
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -32,6 +35,13 @@ jobs:
           KB_EMBED_MODEL: sentence-transformers/all-MiniLM-L6-v2
         run: |
           python .github/scripts/kb_index.py
+
+      - name: Debug list index dir
+        run: |
+          echo "Listing .kb_index:"
+          ls -la .kb_index || true
+          echo "Tree:"
+          find .kb_index -type f -maxdepth 2 -print || true
 
       - name: Upload KB index artifact
         uses: actions/upload-artifact@v4
