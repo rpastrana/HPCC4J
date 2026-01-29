@@ -7,7 +7,7 @@ source:
   url: https://github.com/hpcc-systems/hpcc4j/wiki
   ref_type: branch
   ref: master
-  last_verified: 2026-01-23
+  last_verified: 2026-01-24
 applies_to:
   hpcc4j: ">= 7.4"
   hpcc_platform: ">= 6.0"
