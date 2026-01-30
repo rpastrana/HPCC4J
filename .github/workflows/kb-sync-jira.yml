@@ -1,45 +1,49 @@
-
-name: KB Sync (Jira → KB)
+name: Sync Jira → KB
 
 on:
-  schedule:
-    - cron: '17 4 * * *'   # daily at 04:17 UTC (staggered)
   workflow_dispatch:
-    inputs:
-      jql:
-        description: 'Optional JQL override'
-        required: false
-        type: string
+  schedule:
+    - cron: "0 6 * * 1-5"   # Weekdays at 06:00 UTC; adjust as needed
+  push:
+    branches:
+      - main
+      - master
 
 permissions:
   contents: write
 
 jobs:
-  sync:
+  jira_to_kb:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install requests python-slugify pyyaml
+          pip install requests python-slugify
 
-      
-      - name: Export Jira issues to KB
+      - name: Run Jira → KB export
         env:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          # Use secret if set (and non-empty), else default to the HPCC Systems cloud Jira
           JIRA_BASE: ${{ secrets.JIRA_BASE != '' && secrets.JIRA_BASE || 'https://hpccsystems.atlassian.net' }}
           INPUT_JQL: ""
         run: |
           set -euo pipefail
           echo "Using JIRA_BASE=${JIRA_BASE}"
+
           python .github/scripts/jira_to_kb.py \
             --base "${JIRA_BASE}" \
             --auth "$JIRA_EMAIL:$JIRA_API_TOKEN" \
@@ -48,11 +52,35 @@ jobs:
             --out kb/hpcc4j/jira \
             --debug
 
-
-      - name: Commit changes (if any)
+      - name: Commit KB output
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
+
+          echo "== Git diagnostics (before) =="
+          git rev-parse --abbrev-ref HEAD || true
+          git status --porcelain || true
+          git remote -v || true
+
+          # Configure git author for CI commits
           git config user.name "kb-bot"
           git config user.email "kb-bot@users.noreply.github.com"
+
+          # Stage only the KB directory
           git add kb/hpcc4j/jira
-          git diff --quiet || git commit -m "docs(kb): sync JIRA → KB (auto)"
-          git diff --quiet || git push
+
+          echo "== Git diagnostics (after add) =="
+          git status --porcelain || true
+
+          # Commit only if there are staged changes
+          if git diff --cached --quiet; then
+            echo "No KB updates to commit."
+            exit 0
+          fi
+
+          git commit -m "docs(kb): sync JIRA → KB (auto)"
+          # Rebase to reduce push rejections on race
+          git pull --rebase || true
+          git push
