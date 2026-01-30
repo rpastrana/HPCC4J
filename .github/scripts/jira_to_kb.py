@@ -1,7 +1,13 @@
-
 #!/usr/bin/env python3
-import os, sys, json, argparse, hashlib, textwrap, datetime as dt
+import os
+import sys
+import json
+import argparse
+import hashlib
+import textwrap
+import datetime as dt
 from typing import List, Dict, Any, Optional
+
 import requests
 from slugify import slugify
 
@@ -10,7 +16,7 @@ def ymd(ts: Optional[str]) -> Optional[str]:
     if not ts:
         return None
     try:
-        ts2 = ts.replace('Z','+00:00')
+        ts2 = ts.replace('Z', '+00:00')
         return dt.datetime.fromisoformat(ts2).date().isoformat()
     except Exception:
         return ts.split('T')[0] if 'T' in ts else ts
@@ -19,29 +25,25 @@ def safe_list(x):
     return x if isinstance(x, list) else []
 
 FM_ORDER = [
-    'id','title','source','applies_to','audience','confidence','tags'
+    'id', 'title', 'source', 'applies_to', 'audience', 'confidence', 'tags'
 ]
 
 def front_matter(data: Dict[str, Any]) -> str:
     def emit_val(v, indent=''):
         if isinstance(v, dict):
-            lines=[]
+            lines = []
             for k in v:
                 val = emit_val(v[k], indent + '  ')
-                if "
-" in val:
-                    lines.append(f"{indent}{k}:
-{val}")
+                if "\n" in val:
+                    lines.append(f"{indent}{k}:\n{val}")
                 else:
                     lines.append(f"{indent}{k}: {val}")
-            return "
-".join(lines)
+            return "\n".join(lines)
         elif isinstance(v, list):
             if not v:
                 return '[]'
-            lines=[f"{indent}- {emit_val(i, indent + '  ').strip()}" for i in v]
-            return "
-".join(lines)
+            lines = [f"{indent}- {emit_val(i, indent + '  ').strip()}" for i in v]
+            return "\n".join(lines)
         elif v is None:
             return 'null'
         elif isinstance(v, bool):
@@ -50,42 +52,38 @@ def front_matter(data: Dict[str, Any]) -> str:
             return str(v)
         else:
             s = str(v)
-            if any(ch in s for ch in [":", "
-", '"', "'"]):
-                s = s.replace('
-','\n')
+            if any(ch in s for ch in [":", "\n", '"', "'"]):
+                # Normalize newlines and escape quotes for YAML safety
+                s = s.replace('\r\n', '\n').replace('\r', '\n')
+                s = s.replace('"', '\\"')
                 return '"' + s + '"'
             return s
-    lines=['---']
+
+    lines = ['---']
     for k in FM_ORDER:
         if k in data:
             v = emit_val(data[k])
-            if "
-" in v:
-                lines.append(f"{k}:
-{v}")
+            if "\n" in v:
+                lines.append(f"{k}:\n{v}")
             else:
                 lines.append(f"{k}: {v}")
-    for k in sorted(set(data.keys())-set(FM_ORDER)):
+    for k in sorted(set(data.keys()) - set(FM_ORDER)):
         v = emit_val(data[k])
-        if "
-" in v:
-            lines.append(f"{k}:
-{v}")
+        if "\n" in v:
+            lines.append(f"{k}:\n{v}")
         else:
             lines.append(f"{k}: {v}")
     lines.append('---')
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 # --- Fetch ---
 
-def fetch_jira_issues(base:str, auth_tuple, jql:str, limit:int=25) -> List[Dict[str,Any]]:
-    headers={'Accept':'application/json'}
-    issues=[]
+def fetch_jira_issues(base: str, auth_tuple, jql: str, limit: int = 25) -> List[Dict[str, Any]]:
+    headers = {'Accept': 'application/json'}
+    issues: List[Dict[str, Any]] = []
     url = base.rstrip('/') + '/rest/api/3/search/jql'
-    params={'jql': jql, 'maxResults': 100}
-    next_token=None
+    params = {'jql': jql, 'maxResults': 100}
+    next_token = None
     session = requests.Session()
     session.auth = auth_tuple
 
@@ -93,40 +91,40 @@ def fetch_jira_issues(base:str, auth_tuple, jql:str, limit:int=25) -> List[Dict[
         while True:
             q = params.copy()
             if next_token:
-                q['nextPageToken']=next_token
+                q['nextPageToken'] = next_token
             r = session.get(url, headers=headers, params=q, timeout=30)
             if r.status_code == 404:
                 raise RuntimeError('search/jql not available')
             r.raise_for_status()
-            data=r.json()
+            data = r.json()
             batch = data.get('issues') or []
             issues.extend(batch)
             next_token = data.get('nextPageToken')
-            if not next_token or len(issues)>=limit:
+            if not next_token or len(issues) >= limit:
                 break
         return issues[:limit]
     except Exception:
         # fallback to classic /search
         url2 = base.rstrip('/') + '/rest/api/3/search'
-        startAt=0
+        startAt = 0
         while True:
-            q={'jql': jql, 'maxResults': 50, 'startAt': startAt}
+            q = {'jql': jql, 'maxResults': 50, 'startAt': startAt}
             r = session.get(url2, headers=headers, params=q, timeout=30)
             r.raise_for_status()
-            data=r.json()
-            batch=data.get('issues',[])
+            data = r.json()
+            batch = data.get('issues', [])
             issues.extend(batch)
-            if len(batch)<50 or len(issues)>=limit:
+            if len(batch) < 50 or len(issues) >= limit:
                 break
             startAt += 50
         return issues[:limit]
 
 # --- Transform ---
 
-def to_kb_markdown(issue:Dict[str,Any], base_url:str) -> str:
+def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
     key = issue.get('key')
-    fields = issue.get('fields',{})
-    summary = fields.get('summary','')
+    fields = issue.get('fields', {})
+    summary = fields.get('summary', '')
     status = (fields.get('status') or {}).get('name')
     statusCat = ((fields.get('status') or {}).get('statusCategory') or {}).get('name')
     resolution = (fields.get('resolution') or {}).get('name')
@@ -138,15 +136,15 @@ def to_kb_markdown(issue:Dict[str,Any], base_url:str) -> str:
     fixVersions = [fv.get('name') for fv in (fields.get('fixVersions') or []) if fv.get('name')]
     description = fields.get('description') or ''
 
-    rel_lines=[]
+    rel_lines = []
     for link in (fields.get('issuelinks') or []):
-        outkey=None
+        outkey = None
         if link.get('inwardIssue'):
             outkey = link['inwardIssue'].get('key')
         if link.get('outwardIssue'):
             outkey = link['outwardIssue'].get('key')
         if outkey:
-            desc = (link.get('type',{}) or {}).get('name') or 'related'
+            desc = (link.get('type', {}) or {}).get('name') or 'related'
             rel_lines.append(f"- {desc}: {outkey}")
 
     fm = {
@@ -171,19 +169,23 @@ def to_kb_markdown(issue:Dict[str,Any], base_url:str) -> str:
             'hpcc4j': '*' if not fixVersions else f">= {fixVersions[0]}"
         },
         'audience': 'developer',
-        'confidence': 'high' if (statusCat=='Done') else 'medium',
-        'tags': ['jira','change-log','rationale']
+        'confidence': 'high' if (statusCat == 'Done') else 'medium',
+        'tags': ['jira', 'change-log', 'rationale']
     }
 
-    parts = []
+    parts: List[str] = []
     parts.append(front_matter(fm))
-    parts.append("## Outcome (from JIRA)
-" + (summary if description=='' else summary + "
 
-" + (description if isinstance(description,str) else json.dumps(description)[:1000])) + "
-")
+    # Description may be a string or ADF (object). For non-string, keep a compact JSON preview.
+    desc_text = description if isinstance(description, str) else json.dumps(description)[:1000]
+    if summary and desc_text and desc_text != summary:
+        body = summary + "\n\n" + desc_text
+    else:
+        body = summary or desc_text or ""
 
-    guidance = []
+    parts.append("## Outcome (from JIRA)\n" + body + "\n")
+
+    guidance: List[str] = []
     if resolution == 'Fixed':
         guidance.append('Prefer the fixed/updated path; avoid re-introducing previous behavior.')
     elif resolution in ("Won't Fix", 'Rejected'):
@@ -194,19 +196,12 @@ def to_kb_markdown(issue:Dict[str,Any], base_url:str) -> str:
         guidance.append('Follow documented outcome; gate by fixVersions if applicable.')
 
     if guidance:
-        parts.append("## Agent guidance
-- " + "
-- ".join(guidance) + "
-")
+        parts.append("## Agent guidance\n- " + "\n- ".join(guidance) + "\n")
 
     if rel_lines:
-        parts.append("## Related
-" + "
-".join(rel_lines) + "
-")
+        parts.append("## Related\n" + "\n".join(rel_lines) + "\n")
 
-    return "
-".join(parts)
+    return "\n".join(parts)
 
 
 def main():
@@ -222,7 +217,7 @@ def main():
         print('Invalid --auth format; expected email:token', file=sys.stderr)
         sys.exit(2)
 
-    email, token = args.auth.split(':',1)
+    email, token = args.auth.split(':', 1)
     session = requests.Session()
     session.auth = (email, token)
 
@@ -231,16 +226,16 @@ def main():
 
     for it in issues:
         key = it.get('key')
-        summary = (it.get('fields') or {}).get('summary','')
+        summary = (it.get('fields') or {}).get('summary', '')
         slug = slugify(summary)[:80] if summary else 'issue'
         outpath = os.path.join(args.out, f"{key}--{slug}.md")
         md = to_kb_markdown(it, args.base)
         prev = None
         if os.path.exists(outpath):
-            with open(outpath,'r',encoding='utf-8') as f:
+            with open(outpath, 'r', encoding='utf-8') as f:
                 prev = f.read()
         if prev != md:
-            with open(outpath,'w',encoding='utf-8') as f:
+            with open(outpath, 'w', encoding='utf-8') as f:
                 f.write(md)
             print('WROTE', outpath)
         else:
@@ -248,3 +243,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+``
