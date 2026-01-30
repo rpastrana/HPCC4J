@@ -284,7 +284,6 @@ def main():
         issues = fetch_jira_issues(base, (email, token), args.jql, args.limit)
     except requests.HTTPError as http_err:
         logging.error("HTTP error: %s", http_err)
-        # Additional context if possible
         if getattr(http_err, 'response', None) is not None:
             logging.error("Response body: %s", http_err.response.text[:1000])
         raise
