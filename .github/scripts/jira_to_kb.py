@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional
 import requests
 from slugify import slugify
 
+DEFAULT_JIRA_BASE = "https://hpccsystems.atlassian.net"
+
 # --- Helpers ---
 def ymd(ts: Optional[str]) -> Optional[str]:
     if not ts:
@@ -195,47 +197,3 @@ def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
         parts.append("## Agent guidance\n- " + "\n- ".join(guidance) + "\n")
 
     if rel_lines:
-        parts.append("## Related\n" + "\n".join(rel_lines) + "\n")
-
-    return "\n".join(parts)
-
-
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument('--base', required=True, help='Jira base URL, e.g., https://hpccsystems.atlassian.net')
-    p.add_argument('--auth', required=True, help='email:api_token')
-    p.add_argument('--jql', required=True)
-    p.add_argument('--out', required=True)
-    p.add_argument('--limit', type=int, default=25)
-    args = p.parse_args()
-
-    if ':' not in args.auth:
-        print('Invalid --auth format; expected email:token', file=sys.stderr)
-        sys.exit(2)
-
-    email, token = args.auth.split(':', 1)
-    session = requests.Session()
-    session.auth = (email, token)
-
-    issues = fetch_jira_issues(args.base, (email, token), args.jql, args.limit)
-    os.makedirs(args.out, exist_ok=True)
-
-    for it in issues:
-        key = it.get('key')
-        summary = (it.get('fields') or {}).get('summary', '')
-        slug = slugify(summary)[:80] if summary else 'issue'
-        outpath = os.path.join(args.out, f"{key}--{slug}.md")
-        md = to_kb_markdown(it, args.base)
-        prev = None
-        if os.path.exists(outpath):
-            with open(outpath, 'r', encoding='utf-8') as f:
-                prev = f.read()
-        if prev != md:
-            with open(outpath, 'w', encoding='utf-8') as f:
-                f.write(md)
-            print('WROTE', outpath)
-        else:
-            print('UNCHANGED', outpath)
-
-if __name__ == '__main__':
-    main()
