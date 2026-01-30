@@ -4,12 +4,30 @@ import sys
 import json
 import argparse
 import datetime as dt
+import logging
 from typing import List, Dict, Any, Optional
 
 import requests
 from slugify import slugify
 
 DEFAULT_JIRA_BASE = "https://hpccsystems.atlassian.net"
+
+# --- Logging helpers ---
+def setup_logging(debug: bool) -> None:
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(message)s",
+    )
+
+def mask_email(email: str) -> str:
+    try:
+        name, domain = email.split("@", 1)
+        if len(name) <= 2:
+            return "***@" + domain
+        return name[0] + "***" + name[-1] + "@" + domain
+    except Exception:
+        return "***"
 
 # --- Helpers ---
 def ymd(ts: Optional[str]) -> Optional[str]:
@@ -86,32 +104,48 @@ def fetch_jira_issues(base: str, auth_tuple, jql: str, limit: int = 25) -> List[
     session = requests.Session()
     session.auth = auth_tuple
 
+    logging.debug("FETCH (v3 search/jql) URL=%s params=%s", url, params)
+
     try:
         while True:
             q = params.copy()
             if next_token:
                 q['nextPageToken'] = next_token
             r = session.get(url, headers=headers, params=q, timeout=30)
+            logging.debug("HTTP %s %s -> %s", "GET", r.url, r.status_code)
             if r.status_code == 404:
                 raise RuntimeError('search/jql not available')
             r.raise_for_status()
             data = r.json()
+            # Debug a compact preview
+            logging.debug("Response keys: %s", list(data.keys()))
+            if 'issues' not in data:
+                logging.warning("No 'issues' key in response. Full JSON preview: %s",
+                                json.dumps(data)[:1000])
             batch = data.get('issues') or []
+            logging.info("Fetched %d issues in batch (token=%s)", len(batch), next_token)
             issues.extend(batch)
             next_token = data.get('nextPageToken')
             if not next_token or len(issues) >= limit:
                 break
         return issues[:limit]
-    except Exception:
-        # fallback to classic /search
+    except Exception as e:
+        logging.info("Falling back to classic /search due to: %s", e)
         url2 = base.rstrip('/') + '/rest/api/3/search'
         startAt = 0
         while True:
             q = {'jql': jql, 'maxResults': 50, 'startAt': startAt}
+            logging.debug("FETCH (v3 search) URL=%s params=%s", url2, q)
             r = session.get(url2, headers=headers, params=q, timeout=30)
+            logging.debug("HTTP %s %s -> %s", "GET", r.url, r.status_code)
             r.raise_for_status()
             data = r.json()
+            logging.debug("Response keys: %s", list(data.keys()))
+            if 'issues' not in data:
+                logging.warning("No 'issues' key in response (classic). Full JSON preview: %s",
+                                json.dumps(data)[:1000])
             batch = data.get('issues', [])
+            logging.info("Fetched %d issues (startAt=%d)", len(batch), startAt)
             issues.extend(batch)
             if len(batch) < 50 or len(issues) >= limit:
                 break
@@ -122,8 +156,8 @@ def fetch_jira_issues(base: str, auth_tuple, jql: str, limit: int = 25) -> List[
 
 def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
     key = issue.get('key')
-    fields = issue.get('fields', {})
-    summary = fields.get('summary', '')
+    fields = issue.get('fields', {}) or {}
+    summary = fields.get('summary', '') or ''
     status = (fields.get('status') or {}).get('name')
     statusCat = ((fields.get('status') or {}).get('statusCategory') or {}).get('name')
     resolution = (fields.get('resolution') or {}).get('name')
@@ -148,10 +182,10 @@ def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
 
     fm = {
         'id': f'jira-{key}',
-        'title': f'{key} – {summary}',
+        'title': f'{key} – {summary}' if key else summary or 'Jira issue',
         'source': {
             'type': 'jira',
-            'url': f"{base_url.rstrip('/')}/browse/{key}",
+            'url': f"{base_url.rstrip('/')}/browse/{key}" if key else base_url.rstrip('/'),
             'project': 'HPCC4J',
             'key': key,
             'status': status,
@@ -215,9 +249,22 @@ def main():
     p.add_argument('--jql', required=True, help='JQL query string')
     p.add_argument('--out', required=True, help='Output folder for markdown files')
     p.add_argument('--limit', type=int, default=25, help='Max number of issues to fetch (default: 25)')
+    p.add_argument('--debug', action='store_true', help='Enable verbose debug logging')
     args = p.parse_args()
 
-    base = (args.base or "").strip()
+    setup_logging(args.debug)
+
+    # Resolve base, allowing empty to fall back to env/default
+    base = (args.base or "").strip() or os.environ.get('JIRA_BASE', '').strip() or DEFAULT_JIRA_BASE
+
+    # Early banner
+    masked = mask_email(args.auth.split(':', 1)[0]) if ':' in args.auth else '***'
+    logging.info("Starting jira_to_kb")
+    logging.info("Base: %s", base)
+    logging.info("Auth (email): %s", masked)
+    logging.info("Limit: %s", args.limit)
+    logging.info("JQL (first 200 chars): %s", (args.jql or '')[:200])
+
     if not (base.startswith('http://') or base.startswith('https://')):
         print(
             f"Error: --base must be a full URL like https://your-domain.atlassian.net; got: {args.base!r}",
@@ -233,25 +280,64 @@ def main():
     session = requests.Session()
     session.auth = (email, token)
 
-    issues = fetch_jira_issues(base, (email, token), args.jql, args.limit)
+    try:
+        issues = fetch_jira_issues(base, (email, token), args.jql, args.limit)
+    except requests.HTTPError as http_err:
+        logging.error("HTTP error: %s", http_err)
+        # Additional context if possible
+        if getattr(http_err, 'response', None) is not None:
+            logging.error("Response body: %s", http_err.response.text[:1000])
+        raise
+    except Exception as e:
+        logging.error("Failed to fetch issues: %s", e)
+        raise
+
+    logging.info("Total issues retrieved: %d", len(issues))
     os.makedirs(args.out, exist_ok=True)
+
+    written = 0
+    skipped = 0
+    unchanged = 0
 
     for it in issues:
         key = it.get('key')
-        summary = (it.get('fields') or {}).get('summary', '')
+        fields = (it.get('fields') or {})
+        summary = (fields or {}).get('summary', '') or ''
+
+        # Per-issue debug
+        logging.debug("ISSUE raw keys=%s", list(it.keys()))
+        logging.debug("ISSUE %s | %s", key, summary)
+
+        # Fallback if key is missing, try id; else skip
+        if not key:
+            fallback_id = it.get('id')
+            if fallback_id:
+                logging.warning("Issue missing 'key', using 'id' as filename base: %s", fallback_id)
+                key = fallback_id
+            else:
+                logging.warning("Skipping issue without 'key' and 'id': %s", json.dumps(it)[:500])
+                skipped += 1
+                continue
+
         slug = slugify(summary)[:80] if summary else 'issue'
         outpath = os.path.join(args.out, f"{key}--{slug}.md")
         md = to_kb_markdown(it, base)
+
         prev = None
         if os.path.exists(outpath):
             with open(outpath, 'r', encoding='utf-8') as f:
                 prev = f.read()
+
         if prev != md:
             with open(outpath, 'w', encoding='utf-8') as f:
                 f.write(md)
             print('WROTE', outpath)
+            written += 1
         else:
             print('UNCHANGED', outpath)
+            unchanged += 1
+
+    logging.info("Done. Written=%d, Unchanged=%d, Skipped=%d", written, unchanged, skipped)
 
 if __name__ == '__main__':
     main()
