@@ -30,22 +30,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests python-slugify pyyaml
 
+      
       - name: Export Jira issues to KB
         env:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
-          # If secrets.JIRA_BASE is set and non-empty, use it; otherwise use the default
           JIRA_BASE: ${{ secrets.JIRA_BASE != '' && secrets.JIRA_BASE || 'https://hpccsystems.atlassian.net' }}
-
           INPUT_JQL: ""
         run: |
           set -euo pipefail
+          echo "Using JIRA_BASE=${JIRA_BASE}"
           python .github/scripts/jira_to_kb.py \
-            --base "${JIRA_BASE:-}" \
+            --base "${JIRA_BASE}" \
             --auth "$JIRA_EMAIL:$JIRA_API_TOKEN" \
             --jql "${INPUT_JQL:-project=HPCC4J AND (statusCategory in ('To Do','In Progress') OR (statusCategory = Done AND updated >= -365d)) ORDER BY updated DESC}" \
             --limit 25 \
-            --out kb/hpcc4j/jira
+            --out kb/hpcc4j/jira \
+            --debug
+
 
       - name: Commit changes (if any)
         run: |
