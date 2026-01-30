@@ -1,0 +1,3 @@
+- id: t-jira-key-example
+  question: "Where can I find details for JAPI-467?"
+  expect_source_ids: ["jira-JAPI-467"]
