@@ -1,0 +1,48 @@
+
+name: KB Sync (Jira → KB)
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # daily at 04:17 UTC (staggered)
+  workflow_dispatch:
+    inputs:
+      jql:
+        description: 'Optional JQL override'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-slugify pyyaml
+
+      - name: Run Jira → KB extractor
+        env:
+          JIRA_BASE: ${{ secrets.JIRA_BASE }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          INPUT_JQL: ${{ inputs.jql }}
+        run: |
+          python .github/scripts/jira_to_kb.py             --base "$JIRA_BASE"             --auth "$JIRA_EMAIL:$JIRA_API_TOKEN"             --jql "${INPUT_JQL:-project=HPCC4J AND (statusCategory in ('To Do','In Progress') OR (statusCategory = Done AND updated >= -365d)) ORDER BY updated DESC}"             --limit 25             --out kb/hpcc4j/jira
+
+      - name: Commit changes (if any)
+        run: |
+          git config user.name "kb-bot"
+          git config user.email "kb-bot@users.noreply.github.com"
+          git add kb/hpcc4j/jira
+          git diff --quiet || git commit -m "docs(kb): sync JIRA → KB (auto)"
+          git diff --quiet || git push
