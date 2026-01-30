@@ -197,3 +197,61 @@ def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
         parts.append("## Agent guidance\n- " + "\n- ".join(guidance) + "\n")
 
     if rel_lines:
+        parts.append("## Related\n" + "\n".join(rel_lines) + "\n")
+
+    return "\n".join(parts)
+
+
+def main():
+    p = argparse.ArgumentParser(
+        description="Fetch Jira issues via JQL and export them to a knowledge base folder."
+    )
+    p.add_argument(
+        '--base',
+        default=os.environ.get('JIRA_BASE', DEFAULT_JIRA_BASE),
+        help=f'Jira base URL (default: %(default)s)'
+    )
+    p.add_argument('--auth', required=True, help='email:api_token')
+    p.add_argument('--jql', required=True, help='JQL query string')
+    p.add_argument('--out', required=True, help='Output folder for markdown files')
+    p.add_argument('--limit', type=int, default=25, help='Max number of issues to fetch (default: 25)')
+    args = p.parse_args()
+
+    base = (args.base or "").strip()
+    if not (base.startswith('http://') or base.startswith('https://')):
+        print(
+            f"Error: --base must be a full URL like https://your-domain.atlassian.net; got: {args.base!r}",
+            file=sys.stderr
+        )
+        sys.exit(2)
+
+    if ':' not in args.auth:
+        print('Invalid --auth format; expected email:token', file=sys.stderr)
+        sys.exit(2)
+
+    email, token = args.auth.split(':', 1)
+    session = requests.Session()
+    session.auth = (email, token)
+
+    issues = fetch_jira_issues(base, (email, token), args.jql, args.limit)
+    os.makedirs(args.out, exist_ok=True)
+
+    for it in issues:
+        key = it.get('key')
+        summary = (it.get('fields') or {}).get('summary', '')
+        slug = slugify(summary)[:80] if summary else 'issue'
+        outpath = os.path.join(args.out, f"{key}--{slug}.md")
+        md = to_kb_markdown(it, base)
+        prev = None
+        if os.path.exists(outpath):
+            with open(outpath, 'r', encoding='utf-8') as f:
+                prev = f.read()
+        if prev != md:
+            with open(outpath, 'w', encoding='utf-8') as f:
+                f.write(md)
+            print('WROTE', outpath)
+        else:
+            print('UNCHANGED', outpath)
+
+if __name__ == '__main__':
+    main()
