@@ -3,8 +3,6 @@ import os
 import sys
 import json
 import argparse
-import hashlib
-import textwrap
 import datetime as dt
 from typing import List, Dict, Any, Optional
 
@@ -53,7 +51,6 @@ def front_matter(data: Dict[str, Any]) -> str:
         else:
             s = str(v)
             if any(ch in s for ch in [":", "\n", '"', "'"]):
-                # Normalize newlines and escape quotes for YAML safety
                 s = s.replace('\r\n', '\n').replace('\r', '\n')
                 s = s.replace('"', '\\"')
                 return '"' + s + '"'
@@ -176,7 +173,6 @@ def to_kb_markdown(issue: Dict[str, Any], base_url: str) -> str:
     parts: List[str] = []
     parts.append(front_matter(fm))
 
-    # Description may be a string or ADF (object). For non-string, keep a compact JSON preview.
     desc_text = description if isinstance(description, str) else json.dumps(description)[:1000]
     if summary and desc_text and desc_text != summary:
         body = summary + "\n\n" + desc_text
@@ -243,4 +239,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-``
