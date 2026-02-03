@@ -1,0 +1,77 @@
+# .github/scripts/hpcc4j-topics-to-kb-map.yml
+# Maps repo-relative paths (under --kb-root) to module, section_path, and topics.
+# You can add multiple patterns using the "a|b|c" syntax in "match".
+
+rules:
+  # README -> Overview & Setup
+  - match: "README.md|**/README.md"
+    module: "hpcc4j"
+    section_path:
+      - "Overview & Orientation"
+    topics: ["overview","components","build","security","versions"]
+
+  # Code architecture -> Architecture & Internals
+  - match: "CodeArchitectureAnalysis.md"
+    module: "hpcc4j"
+    section_path:
+      - "Architecture & Internals"
+    topics: ["architecture","design","dependencies","layers"]
+
+  # Wiki — Tracing / Observability
+  - match: "wiki/*Tracing*|wiki/*Observ*"
+    module: "observability"
+    section_path:
+      - "Observability & Tracing"
+      - "OpenTelemetry"
+    topics: ["otel","javaagent","tracing","jaeger","zipkin","elastic"]
+
+  # Wiki — Troubleshooting
+  - match: "wiki/*Common*Issues*|wiki/*Troubleshoot*"
+    module: "_troubleshooting"
+    section_path:
+      - "Troubleshooting & Common Issues"
+    topics: ["errors","auth","dfs","wrappers","permissions","keys"]
+
+  # Spark examples (PySpark notebook and others)
+  - match: "spark-hpcc/Examples/*|*PySparkExample*"
+    module: "spark-hpcc"
+    section_path:
+      - "Examples & Notebooks"
+      - "Spark-HPCC"
+    topics: ["spark","connector","read","write","dataframe"]
+
+  # Module-specific docs (if/when you add READMEs under module dirs)
+  - match: "wsclient/**"
+    module: "wsclient"
+    section_path:
+      - "Modules & APIs"
+      - "wsclient"
+    topics: ["esp","workunits","dfu","filespray","topology","timeout","auth"]
+
+  - match: "dfsclient/**"
+    module: "dfsclient"
+    section_path:
+      - "Modules & APIs"
+      - "dfsclient"
+    topics: ["dfs","read","write","layout","indexed","sequential","performance"]
+
+  - match: "commons-hpcc/**"
+    module: "commons-hpcc"
+    section_path:
+      - "Modules & APIs"
+      - "commons-hpcc"
+    topics: ["utils","serialization","config"]
+
+  - match: "clienttools/**"
+    module: "clienttools"
+    section_path:
+      - "Modules & APIs"
+      - "clienttools"
+    topics: ["eclcc","compile","local"]
+
+  - match: "rdf2hpcc/**"
+    module: "rdf2hpcc"
+    section_path:
+      - "Modules & APIs"
+      - "rdf2hpcc"
+    topics: ["jena","rdf","ingest"]
