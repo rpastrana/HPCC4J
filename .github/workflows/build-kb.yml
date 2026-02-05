@@ -4,7 +4,28 @@ on:
   workflow_dispatch:
   push:
     branches: [ master ]
+    paths:
+      - 'kb/**'
+      - '.github/workflows/build-kb.yml'
+      - '.github/scripts/jira_to_kb.py'
+      - '.github/scripts/kb_index.py'
+      - '.github/scripts/kb-source-markdow-chunk.py'
+      - '.github/scripts/requirements-rag.txt'
+      - '.github/scripts/constraints-rag.txt'
+      - '.github/scripts/hpcc4j-topics-to-kb-map.yml'
+      - 'README.md'
+      - 'MIGRATION-*.md'
+      - 'CodeArchitectureAnalysis.md'
   pull_request:
+    paths:
+      - 'kb/**'
+      - '.github/workflows/build-kb.yml'
+      - '.github/scripts/jira_to_kb.py'
+      - '.github/scripts/kb_index.py'
+      - '.github/scripts/kb-source-markdow-chunk.py'
+      - '.github/scripts/requirements-rag.txt'
+      - '.github/scripts/constraints-rag.txt'
+      - '.github/scripts/hpcc4j-topics-to-kb-map.yml'
 
 permissions:
   contents: read

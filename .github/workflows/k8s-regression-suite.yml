@@ -5,6 +5,22 @@ on:
     branches:
       - "master"
       - "candidate-*"
+    paths:
+      - '**.java'
+      - '**.xml'
+      - '**.properties'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - 'tests/**'
+      - '.github/workflows/k8s-regression-suite.yml'
+      - '.github/workflows/build-docker.yml'
+      - '.github/actions/**'
 
   workflow_dispatch:
 

@@ -5,6 +5,20 @@ on:
     branches:
       - "master"
       - "candidate-*"
+    paths:
+      - '**.java'
+      - '**.xml'
+      - '**.properties'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - 'tests/**'
+      - '.github/workflows/baremetal-regression-suite.yml'
 
   workflow_dispatch:
 

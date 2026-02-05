@@ -14,9 +14,33 @@ name: "CodeQL"
 on:
   push:
     branches: [ "master", "candidate-*" ]
+    paths:
+      - '**.java'
+      - '**.xml'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - '.github/workflows/codeql-analysis.yml'
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "master", "candidate-*" ]
+    paths:
+      - '**.java'
+      - '**.xml'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - '.github/workflows/codeql-analysis.yml'
   schedule:
     - cron: '21 15 * * 4'
 

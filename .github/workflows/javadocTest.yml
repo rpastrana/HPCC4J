@@ -5,6 +5,17 @@ on:
     branches:
       - "master"
       - "candidate-*"
+    paths:
+      - '**.java'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - '.github/workflows/javadocTest.yml'
 
 jobs:
   test-javadoc:
