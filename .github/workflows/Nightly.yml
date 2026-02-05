@@ -3,6 +3,7 @@ name: hpcc4j Nightly
 on:
   schedule:
   - cron: "0 2 * * 1-5"
+  workflow_dispatch:
 
 jobs:
   build:

@@ -4,6 +4,19 @@ on:
   push:
     branches:
       - 'candidate-*'
+    paths:
+      - '**.java'
+      - '**.xml'
+      - '**.properties'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - '.github/workflows/BuildTestCandidateAndMaster.yml'
 
 jobs:
   build:

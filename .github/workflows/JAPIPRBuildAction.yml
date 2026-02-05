@@ -1,6 +1,20 @@
 name: hpcc4j Pull Request Build Tests
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - '**.java'
+      - '**.xml'
+      - '**.properties'
+      - 'pom.xml'
+      - '**/pom.xml'
+      - 'clienttools/**'
+      - 'commons-hpcc/**'
+      - 'dfsclient/**'
+      - 'rdf2hpcc/**'
+      - 'spark-hpcc/**'
+      - 'wsclient/**'
+      - '.github/workflows/JAPIPRBuildAction.yml'
 
 jobs:
   build:
