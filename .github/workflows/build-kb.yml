@@ -1,4 +1,4 @@
-name: Build KB (Curated + Enhanced Chunking + Index)
+name: Build KB (Lean, High-Signal)
 
 on:
   workflow_dispatch:
@@ -14,13 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Jira defaults
+  # Jira configuration (use HPCC4J project)
   JIRA_BASE_URL: https://hpccsystems.atlassian.net
-  JIRA_JQL: 'project = JAPI ORDER BY updated DESC'
+  JIRA_JQL: "project=HPCC4J AND (statusCategory in ('To Do','In Progress') OR (statusCategory = Done AND updated >= -365d)) ORDER BY updated DESC"
   JIRA_PAGE_SIZE: '100'
-  # Safety guard to avoid endless pagination (used by the older inline logic; left here in case we need it again)
-  JIRA_MAX_PAGES: '50'
-  # Used for provenance URLs in enhanced chunks
+  # Source URL base used by the enhanced chunker for provenance
   KB_SOURCE_BASE_URL: https://github.com/rpastrana/HPCC4J/blob/master
 
 jobs:
@@ -29,38 +27,48 @@ jobs:
     defaults:
       run:
         shell: bash
+
     steps:
-      - name: Checkout repository (full history for changelog)
+      # -----------------------------------------------------------------------
+      # Repo & scripts
+      # -----------------------------------------------------------------------
+      - name: Checkout repository (scripts & configuration)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Temurin JDK 17 (with Maven cache)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: maven
-
-      # Javadocs generation disabled
-      - name: Generate aggregated Javadocs (disabled)
-        if: ${{ false }}
+      - name: Ensure helper scripts are executable
         run: |
           set -euo pipefail
-          mvn -B -T1C \
-            -DskipTests \
-            -Dmaven.test.skip=true \
-            -Dmaven.javadoc.failOnError=false \
-            -DadditionalJOptions="-J-Xdoclint:none" \
-            -DoutputDirectory=target/site/apidocs \
-            javadoc:aggregate
+          chmod +x .github/scripts/convert_any_to_md.py || true
+          chmod +x .github/scripts/jira_to_kb.py || true
+          chmod +x .github/scripts/kb-source-markdow-chunk.py || true
 
-      - name: Checkout upstream repo (hpcc-systems/hpcc4j)
+      # -----------------------------------------------------------------------
+      # Upstream sources: prefer candidate-9.12.x; fallback to master
+      # -----------------------------------------------------------------------
+      - name: Checkout upstream repo (hpcc-systems/hpcc4j) 
         uses: actions/checkout@v4
         with:
           repository: hpcc-systems/hpcc4j
           ref: master
           path: upstream
+          fetch-depth: 1
+
+      - name: Switch to candidate-9.12.x if available (fallback-safe)
+        run: |
+          set -euo pipefail
+          git -C upstream remote set-branches --add origin candidate-9.12.x || true
+          git -C upstream fetch origin candidate-9.12.x --depth=1 || true
+
+          if git -C upstream show-ref --verify --quiet refs/remotes/origin/candidate-9.12.x; then
+            git -C upstream checkout -q -B candidate-9.12.x origin/candidate-9.12.x
+            echo "Using hpcc-systems/hpcc4j@candidate-9.12.x"
+          else
+            echo "::warning::hpcc-systems/hpcc4j does not have 'candidate-9.12.x'; continuing on 'master'."
+          fi
+
+          echo "Upstream revision: $(git -C upstream rev-parse --short HEAD)"
 
       - name: Checkout upstream Wiki (hpcc-systems/hpcc4j.wiki)
         uses: actions/checkout@v4
@@ -69,17 +77,21 @@ jobs:
           ref: master
           path: upstream-wiki
 
-      - name: Copy Javadocs → api-reference (only if present)
+      # -----------------------------------------------------------------------
+      # Curate high-signal inputs into kb/
+      # -----------------------------------------------------------------------
+      - name: Stage curated docs
         run: |
           set -euo pipefail
-          if [ -d target/site/apidocs ]; then
-            mkdir -p 'kb/topics/api-reference'
-            cp -a target/site/apidocs/. 'kb/topics/api-reference/'
-          fi
+          mkdir -p kb/topics/howto kb/topics/project-docs kb/topics/connectors-spark-hpcc kb/topics/issues-roadmap
 
-      - name: Copy Wiki markdown → howto
-        run: |
-          set -euo pipefail
+          # Project docs (high-signal)
+          for f in upstream/README.md upstream/MIGRATION-*.md upstream/CodeArchitectureAnalysis.md; do
+            [ -f "$f" ] || continue
+            cp "$f" "kb/topics/project-docs/$(basename "$f")"
+          done
+
+          # Wiki → howto (preserve structure)
           if [ -d upstream-wiki ]; then
             shopt -s globstar nullglob
             for f in upstream-wiki/**/*.md; do
@@ -90,68 +102,50 @@ jobs:
             done
           fi
 
-      - name: Copy project docs → project-docs
-        run: |
-          set -euo pipefail
-          mkdir -p 'kb/topics/project-docs'
-          for f in upstream/README.md upstream/MIGRATION-*.md upstream/CodeArchitectureAnalysis.md; do
-            [ -f "$f" ] || continue
-            cp "$f" "kb/topics/project-docs/$(basename "$f")"
-          done
-
-      - name: Copy Spark connector example → connectors-spark-hpcc
-        run: |
-          set -euo pipefail
+          # Notebook (from current upstream checkout)
           if [ -f upstream/spark-hpcc/Examples/PySparkExample.ipynb ]; then
-            mkdir -p 'kb/topics/connectors-spark-hpcc'
             cp upstream/spark-hpcc/Examples/PySparkExample.ipynb \
-               'kb/topics/connectors-spark-hpcc/PySparkExample.ipynb'
+               "kb/topics/connectors-spark-hpcc/PySparkExample.ipynb"
           fi
 
-      - name: Copy wsclient tests → tests-wsclient
-        run: |
-          set -euo pipefail
-          if [ -d upstream/wsclient/src/test/java/org/hpccsystems/ws/client ]; then
-            mkdir -p "kb/topics/tests-wsclient/"
-            cp -a upstream/wsclient/src/test/java/org/hpccsystems/ws/client \
-                  "kb/topics/tests-wsclient/"
-          fi
-
-      - name: Copy dfsclient tests → tests-dfsclient (if present)
-        run: |
-          set -euo pipefail
-          if [ -d upstream/dfsclient/src/test/java ]; then
-            mkdir -p "kb/topics/tests-dfsclient/"
-            cp -a upstream/dfsclient/src/test/java \
-                  "kb/topics/tests-dfsclient/"
-          fi
-
-      - name: Create CHANGELOG
-        run: |
-          set -euo pipefail
-          mkdir -p 'kb/topics/changelog'
-          git log --date=short --pretty=format:'* %h %ad %s (%an)' -n 500 > 'kb/topics/changelog/CHANGELOG.md'
-
-      - name: Maven dependency tree
-        run: |
-          set -euo pipefail
-          mkdir -p 'kb/topics/dependencies'
-          mvn -B -q -DskipTests -Dmaven.test.skip=true dependency:tree \
-            -DoutputFile='kb/topics/dependencies/dependency-tree.txt' || true
-
-      # ---------- Jira sync via existing Python script (consolidated report + debug) ----------
-      - name: Setup Python (for Jira fetch)
+      # -----------------------------------------------------------------------
+      # Python 3.11 (shared)
+      # -----------------------------------------------------------------------
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Jira script dependencies
+      # -----------------------------------------------------------------------
+      # Generic "any file → Markdown" conversion (externalized, fallback-safe)
+      # -----------------------------------------------------------------------
+      - name: Install generic converters (best-effort)
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
+          # Install what we may use; failures are OK (the script will stub if missing)
+          pip install nbformat nbconvert beautifulsoup4 pdfminer.six python-docx || true
+
+      - name: Convert any file → Markdown (generic)
+        run: |
+          set -euo pipefail
+          python .github/scripts/convert_any_to_md.py \
+            --root kb \
+            --out-root kb \
+            --remove-source \
+            --exclude "topics/tests-*/**" "*/node_modules/**" \
+            --skip-binaries \
+            --preview 0
+
+      # -----------------------------------------------------------------------
+      # Jira digest (single-file report, POST /search/jql via script)
+      # -----------------------------------------------------------------------
+      - name: Install Jira script dependencies
+        run: |
+          set -euo pipefail
           pip install requests python-slugify
 
-      - name: Fetch Jira issues into KB (single consolidated report + debug)
+      - name: Fetch Jira issues into KB (single-file digest + debug)
         env:
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
@@ -164,7 +158,6 @@ jobs:
             exit 0
           fi
 
-          # Run and capture exit code explicitly to avoid pipeline/tee masking
           python .github/scripts/jira_to_kb.py \
             --base "${JIRA_BASE_URL}" \
             --auth "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
@@ -182,10 +175,8 @@ jobs:
             exit "${status}"
           fi
 
-          # Quick sanity checks to help with forensics in logs
-          ls -l 'kb/topics/issues-roadmap' || true
-          echo "First 40 lines of jira-digest.md:"
-          head -n 40 'kb/topics/issues-roadmap/jira-digest.md' || true
+          echo "Digest head:"
+          head -n 30 'kb/topics/issues-roadmap/jira-digest.md' || true
 
       - name: Upload Jira debug log
         if: always()
@@ -196,71 +187,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload KB topics (raw)
-        uses: actions/upload-artifact@v4
-        with:
-          name: kb-topics-raw
-          path: kb/topics/**/*
-          retention-days: 14
-
-      - name: Upload KB staging artifact (curated)
-        uses: actions/upload-artifact@v4
-        with:
-          name: kb-input
-          path: |
-            kb/topics/**/*
-          retention-days: 14
-
-  build_index:
-    needs: build-kb
-    runs-on: ubuntu-latest
-    env:
-      PROJECT_CONFIG: '{}'
-      ANONYMIZED_TELEMETRY: 'false'
-      CHROMA_TELEMETRY_IMPLEMENTATION: 'none'
-      CHROMA_ANONYMIZED_TELEMETRY: 'false'
-    steps:
-      - name: Setup Python early
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Checkout (scripts & constraints)
-        uses: actions/checkout@v4
-
-      - name: Download curated KB artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: kb-input
-          path: kb
-
-      - name: Install dependencies
+      # -----------------------------------------------------------------------
+      # Content hygiene before chunking (Markdown lint & link check)
+      # -----------------------------------------------------------------------
+      - name: Content hygiene (Markdown lint & link check)
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip wheel
-          pip install -r .github/scripts/requirements-rag.txt -c .github/scripts/constraints-rag.txt
+          if ! command -v node >/dev/null 2>&1; then
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          fi
+          # Normalize common Markdown issues in-place
+          npx -y markdownlint-cli2-fix "kb/**/*.md" || true
+          # Link check (tolerate flaky externals with retry)
+          npx -y lychee --no-progress --max-redirects 5 --timeout 20s --retry 1 \
+            --exclude "https://localhost|http://127.0.0.1" \
+            "kb/**/*.md" || true
+
+      # -----------------------------------------------------------------------
+      # Enhanced chunking (primary artifact)
+      # -----------------------------------------------------------------------
+      - name: Install chunker dependencies
+        run: |
+          set -euo pipefail
           pip install pyyaml
-          pip check
 
-      # --- Your existing indexer (kept) ---
-      - name: Build KB index (HF embeddings)
-        env:
-          KB_EMBED_MODEL: sentence-transformers/all-MiniLM-L6-v2
-          KB_ROOT: kb
-        run: |
-          set -euo pipefail
-          python .github/scripts/kb_index.py
-
-      - name: Upload KB index artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: kb-index
-          path: ./.kb_index/**
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 14
-
-      # --- Enhanced, section-aware chunking + metadata (externalized) ---
       - name: Enhanced chunking & metadata (Markdown-aware)
         env:
           KB_ROOT: kb
@@ -276,6 +227,15 @@ jobs:
             --overlap 300 \
             --ext .md .txt \
             --topics-map .github/scripts/hpcc4j-topics-to-kb-map.yml
+            # (Optional once supported by your chunker)
+            # --exclude "topics/tests-*/**" --prepend-section-path
+
+      - name: Upload raw KB (curated Markdown)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kb-sources
+          path: kb/**
+          retention-days: 14
 
       - name: Upload enhanced KB index artifact
         uses: actions/upload-artifact@v4
@@ -286,21 +246,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Create unified KB bundle (curated + both indexes)
+      # -----------------------------------------------------------------------
+      # Lightweight KB quality report
+      # -----------------------------------------------------------------------
+      - name: Build KB quality report
         run: |
           set -euo pipefail
-          mkdir -p dist/kb-bundle
-          cp -a kb dist/kb-bundle/kb
-          [ -d .kb_index ] && cp -a .kb_index dist/kb-bundle/.kb_index || true
-          cp -a .kb_index_enhanced dist/kb-bundle/.kb_index_enhanced
-          tar -czf dist/kb-bundle.tar.gz -C dist kb-bundle
+          mkdir -p dist
+          {
+            echo "## KB Quality Summary"
+            echo "- Date: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "- Source Markdown files: $(find kb -type f -name '*.md' | wc -l | xargs)"
+            echo "- Enhanced chunks (lines in index.jsonl): $(wc -l < .kb_index_enhanced/index.jsonl)"
+            if command -v jq >/dev/null 2>&1; then
+              AVG=$(jq -s 'map(.tokens_estimate) | (add / length)' .kb_index_enhanced/index.jsonl 2>/dev/null || echo "n/a")
+              echo "- Avg tokens per chunk: ${AVG}"
+            fi
+          } > dist/kb-quality-report.md
 
-      - name: Upload unified KB bundle
+      - name: Upload KB quality report
         uses: actions/upload-artifact@v4
         with:
-          name: kb-bundle
-          path: |
-            dist/kb-bundle/**
-            dist/kb-bundle.tar.gz
-          include-hidden-files: true
+          name: kb-quality-report
+          path: dist/kb-quality-report.md
+          if-no-files-found: error
           retention-days: 14
