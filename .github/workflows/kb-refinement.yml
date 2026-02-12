@@ -11,6 +11,7 @@ on:
     paths:
       - "kb/**"
       - ".github/scripts/kb/**"
+      - ".github/scripts/ai/**"
       - ".github/workflows/kb-refinement.yml"
 
 permissions:
@@ -22,6 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Update if your layout differs (e.g., hpcc4j/kb/hpcc4j)
   KB_ROOT: kb/hpcc4j
   OUT_DIR: .kb_index_enhanced
   POLICY_FILE: .github/scripts/kb/chunking-policy.yml
@@ -111,7 +113,8 @@ jobs:
             --policy "${POLICY_FILE}"
 
           if [ ! -s "${OUT_DIR}/index.jsonl" ]; then
-            echo "::warning :: No chunks produced (index.jsonl empty). Check policy globs."
+            echo "::error :: No chunks produced (index.jsonl empty). Check policy globs and KB_ROOT."
+            exit 1
           fi
 
       # --- Summary ------------------------------------------------------------
@@ -120,7 +123,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist
           FILES=$(find "${KB_ROOT}" -type f -name '*.md' | wc -l | xargs)
-          CHUNKS=$( [ -f "${OUT_DIR}/index.jsonl" ] && wc -l < "${OUT_DIR}/index.jsonl" || echo 0 )
+          CHUNKS=$(wc -l < "${OUT_DIR}/index.jsonl" | xargs)
           {
             echo "## KB Refinement Summary"
             echo "- Date: $(date -u +"%Y-%m-%dT%H-%M-%SZ")"
@@ -192,6 +195,12 @@ jobs:
             || { echo "::error :: Missing script: .github/scripts/kb/kb_index_chroma_from_jsonl.py"; exit 1; }
           python .github/scripts/kb/kb_index_chroma_from_jsonl.py
 
+      # --- Verify built Chroma DB actually has a collection -------------------
+      - name: Verify Chroma DB contents (pre-package)
+        run: |
+          set -euo pipefail
+          python .github/scripts/ai/inspect_chroma.py --db ".kb_index" --print-manifest --require-collection
+
       # --- Upload versioned embeddings artifact (optional for debugging) ------
       - name: Upload embeddings artifact (Chroma DB + MANIFEST)
         uses: actions/upload-artifact@v4
@@ -206,7 +215,8 @@ jobs:
         id: pkg_emb
         run: |
           set -euo pipefail
-          test -f ".kb_index/MANIFEST.json" || { echo "::error :: MANIFEST.json not found under .kb_index"; exit 1; }
+          test -f ".kb_index/MANIFEST.json" || { echo "::error :: MANIFEST.json not found under .kb_index (embeddings likely not built)."; exit 1; }
+          python .github/scripts/ai/inspect_chroma.py --db ".kb_index" --require-collection
           tar -czf embeddings_chroma.tgz .kb_index
           echo "pkg=embeddings_chroma.tgz" >> $GITHUB_OUTPUT
 
