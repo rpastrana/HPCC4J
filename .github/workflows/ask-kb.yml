@@ -19,7 +19,7 @@ on:
         type: number
         default: 5
       model:
-        description: "Embedding model (only used by rebuild-from-index)"
+        description: "Embedding model (used by rebuild-from-index)"
         type: string
         default: sentence-transformers/all-MiniLM-L6-v2
 
@@ -27,15 +27,15 @@ permissions:
   contents: read
 
 env:
-  # Collection name used in both agents (manifest may override for chroma-release)
   KB_COLLECTION: hpcckb
 
 jobs:
   ask:
     name: Run AI Agent (${{ inputs.agent }})
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout (no submodules needed)
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python 3.11
@@ -49,39 +49,42 @@ jobs:
           python -m pip install --upgrade pip
           pip install chromadb sentence-transformers tqdm pyyaml requests
 
-      - name: Prepare scripts
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          echo "Using pre-created Python scripts in .github/scripts/ai/"
-
-      - name: Run agent (chroma-release)
+      - name: Download embeddings bundle (only for chroma-release)
         if: ${{ inputs.agent == 'chroma-release' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .artifacts
-          echo "Downloading embeddings_chroma.tgz from embeddings-latest..."
           gh release download embeddings-latest --pattern "embeddings_chroma.tgz" --dir .artifacts
           tar -xzf .artifacts/embeddings_chroma.tgz
-          test -f .kb_index/MANIFEST.json || echo "::warning :: MANIFEST.json not found under .kb_index"
+          # Diagnostics and validation
+          python .github/scripts/ai/inspect_chroma.py --db ".kb_index" --print-manifest --require-collection
+
+      - name: Run agent (chroma-release)
+        if: ${{ inputs.agent == 'chroma-release' }}
+        run: |
+          set -euo pipefail
           python .github/scripts/ai/agent_chroma_release.py \
             --db ".kb_index" \
-            --collection "${KB_COLLECTION}" \
+            --collection "${KB_COLLECTION:-}" \
             --question "${{ inputs.question }}" \
             --top-k "${{ inputs.top_k }}"
 
-      - name: Run agent (rebuild-from-index)
+      - name: Download kb-latest index (only for rebuild-from-index)
         if: ${{ inputs.agent == 'rebuild-from-index' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p .kb_index_enhanced
-          echo "Downloading index.jsonl from kb-latest..."
           gh release download kb-latest --pattern "index.jsonl" --dir .kb_index_enhanced
-          test -f .kb_index_enhanced/index.jsonl
+          test -s .kb_index_enhanced/index.jsonl
+
+      - name: Run agent (rebuild-from-index)
+        if: ${{ inputs.agent == 'rebuild-from-index' }}
+        run: |
+          set -euo pipefail
           python .github/scripts/ai/agent_from_index.py \
             --index ".kb_index_enhanced/index.jsonl" \
             --persist ".kb_index_ephemeral" \

@@ -1,160 +1,183 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+kb_index_chroma_from_jsonl.py
+
+Reads a refined KB index (JSONL), computes embeddings with SentenceTransformers,
+writes a persistent Chroma collection, and emits a MANIFEST.json with metadata.
+
+Env:
+  KB_INDEX_JSONL   -> path to index.jsonl (default: .kb_index_enhanced/index.jsonl)
+  KB_DB_DIR        -> output Chroma persist dir (default: .kb_index)
+  KB_EMBED_MODEL   -> sentence-transformers model (default: sentence-transformers/all-MiniLM-L6-v2)
+  KB_COLLECTION    -> collection name (default: hpcckb)
+  KB_BATCH_SIZE    -> embedding batch size (default: 256)
+  KB_SOURCE_SHA    -> git sha (optional)
+  KB_SOURCE_REF    -> git ref (optional)
+  KB_SOURCE_REPO   -> repo name (optional)
+"""
+
+from __future__ import annotations
 import json
+import math
 import os
-import time
-from typing import Dict, Any, List, Iterator
+import sys
+from typing import Dict, Any, Iterable, List
 
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from chromadb.config import Settings
+def evar(name: str, default: str | None = None) -> str:
+    v = os.environ.get(name)
+    return v if v is not None else (default or "")
 
-DEFAULT_INDEX_JSONL = os.environ.get("KB_INDEX_JSONL", ".kb_index_enhanced/index.jsonl")
-DB_DIR = os.environ.get("KB_DB_DIR", ".kb_index")
-MODEL_NAME = os.environ.get("KB_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-COLLECTION = os.environ.get("KB_COLLECTION", "hpcckb")
-BATCH_SIZE = int(os.environ.get("KB_BATCH_SIZE", "256"))
+INDEX_PATH   = evar("KB_INDEX_JSONL", ".kb_index_enhanced/index.jsonl")
+PERSIST_DIR  = evar("KB_DB_DIR", ".kb_index")
+MODEL_NAME   = evar("KB_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+COLLECTION   = evar("KB_COLLECTION", "hpcckb")
+BATCH_SIZE   = int(evar("KB_BATCH_SIZE", "256") or "256")
+SRC_SHA      = evar("KB_SOURCE_SHA", "")
+SRC_REF      = evar("KB_SOURCE_REF", "")
+SRC_REPO     = evar("KB_SOURCE_REPO", "")
 
-SOURCE_SHA  = os.environ.get("KB_SOURCE_SHA")  or os.environ.get("GITHUB_SHA", "")
-SOURCE_REF  = os.environ.get("KB_SOURCE_REF")  or os.environ.get("GITHUB_REF_NAME", "")
-SOURCE_REPO = os.environ.get("KB_SOURCE_REPO") or os.environ.get("GITHUB_REPOSITORY", "")
+# ----------------------------- helpers ---------------------------------------
 
-os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
-os.environ.setdefault("CHROMA_ANONYMIZED_TELEMETRY", "false")
-os.environ.setdefault("CHROMA_TELEMETRY_IMPLEMENTATION", "none")
-
-
-def iter_index_jsonl(path: str):
-    with open(path, "r", encoding="utf-8") as fin:
-        for line in fin:
-            line = line.strip()
+def read_jsonl(path: str) -> Iterable[Dict[str, Any]]:
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line=line.strip()
             if not line:
                 continue
             try:
                 yield json.loads(line)
-            except Exception as e:
-                print(f"WARN: skipping non-JSON line: {e}")
+            except Exception:
+                continue
 
+def extract_text(obj: Dict[str, Any]) -> str:
+    for k in ("text","page_content","content","chunk","body"):
+        v = obj.get(k)
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
 
-def infer_dim_or_zero(emb) -> int:
-    try:
-        v = emb.embed_query("dimension probe")
-        return len(v) if v else 0
-    except Exception:
-        return 0
+def extract_id(obj: Dict[str, Any], i: int) -> str:
+    v = obj.get("id")
+    if isinstance(v, (str,int)):
+        return str(v)
+    return f"auto-{i}"
 
+def _is_primitive(v: Any) -> bool:
+    # Allow str, int, float (not NaN), bool
+    if isinstance(v, (str, int, bool)):
+        return True
+    if isinstance(v, float):
+        return not math.isnan(v)
+    return False
 
-def write_manifest(chunks_total: int, dims: int) -> str:
-    manifest = {
-        "kind": "kb-embedding-manifest",
-        "version": 1,
-        "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "source": {
-            "index_jsonl": os.path.abspath(DEFAULT_INDEX_JSONL),
-            "repo": SOURCE_REPO,
-            "ref": SOURCE_REF,
-            "commit": SOURCE_SHA,
-        },
-        "embedding": {
-            "provider": "huggingface",
-            "model": MODEL_NAME,
-            "dims": dims,
-        },
-        "vector_store": {
-            "type": "chroma",
-            "persist_directory": os.path.abspath(DB_DIR),
-            "collection": COLLECTION,
-        },
-        "counts": {
-            "chunks": chunks_total,
-            "batch_size": BATCH_SIZE,
-        },
-        "notes": "Manifest exists even if 0 chunks were embedded (for audit/debug).",
-    }
-    os.makedirs(DB_DIR, exist_ok=True)
-    path = os.path.join(DB_DIR, "MANIFEST.json")
-    with open(path, "w", encoding="utf-8") as fout:
-        json.dump(manifest, fout, ensure_ascii=False, indent=2)
-    return path
+def sanitize_metadata(meta: Any, *, doc_id: str, idx: int) -> Dict[str, Any]:
+    """
+    Ensure metadata is a non-empty dict with primitive values.
+    - If empty/missing, inject {"doc_id": doc_id}
+    - Coerce keys to strings; drop None; stringify non-primitives
+    """
+    out: Dict[str, Any] = {}
+    if isinstance(meta, dict):
+        for k, v in meta.items():
+            if k is None:
+                continue
+            key = str(k)
+            if v is None:
+                continue
+            if _is_primitive(v):
+                out[key] = v
+            else:
+                # stringify lists/dicts/objects to satisfy Chroma validator
+                out[key] = json.dumps(v, ensure_ascii=False)
+    # Guarantee non-empty
+    if not out:
+        out = {"doc_id": doc_id}
+    return out
 
+# ------------------------------ main -----------------------------------------
 
-def main():
-    # Fail fast if index is missing
-    if not os.path.exists(DEFAULT_INDEX_JSONL):
-        print(f"ERROR: index.jsonl not found at {DEFAULT_INDEX_JSONL}")
-        raise SystemExit(2)
+def main() -> None:
+    if not os.path.isfile(INDEX_PATH) or os.path.getsize(INDEX_PATH) == 0:
+        print(f"::error :: index.jsonl missing or empty: {INDEX_PATH}", file=sys.stderr)
+        sys.exit(1)
 
-    print(f"Loading chunks from: {DEFAULT_INDEX_JSONL}")
-    texts, metas, ids = [], [], []
+    docs: List[str] = []
+    metas_raw: List[Any] = []
+    ids: List[str] = []
 
-    for i, rec in enumerate(iter_index_jsonl(DEFAULT_INDEX_JSONL)):
-        text = rec.get("text") or rec.get("chunk") or ""
-        if not text.strip():
+    for i, obj in enumerate(read_jsonl(INDEX_PATH)):
+        txt = extract_text(obj)
+        if not txt.strip():
             continue
-        meta = rec.get("meta") or rec.get("metadata") or {}
-        if "source" not in meta and rec.get("source"):
-            meta["source"] = rec["source"]
-        cid = str(rec.get("id") or rec.get("chunk_id") or f"chunk-{i}")
-        texts.append(text)
-        metas.append(meta)
-        ids.append(cid)
+        did = extract_id(obj, i)
+        docs.append(txt)
+        metas_raw.append(obj.get("metadata"))
+        ids.append(did)
 
-    # Always create the DB dir and a manifest, even if we have 0 chunks
-    os.makedirs(DB_DIR, exist_ok=True)
+    if not docs:
+        print("::error :: No usable text chunks found in index.jsonl.", file=sys.stderr)
+        sys.exit(1)
 
-    if not texts:
-        dims = 0
-        mf = write_manifest(chunks_total=0, dims=dims)
-        print("No chunks found in index.jsonl — wrote manifest only:", mf)
-        # List for diagnostics
-        for root, dirs, files in os.walk(DB_DIR):
-            for f in files:
-                print(os.path.join(root, f))
-        return
+    # Build Chroma (with explicit embeddings)
+    from sentence_transformers import SentenceTransformer
+    import chromadb
+    from chromadb.config import Settings
 
-    print(f"Preparing to embed {len(texts)} chunk(s) with model: {MODEL_NAME}")
-    embeddings = HuggingFaceEmbeddings(model_name=MODEL_NAME)
-    dims = infer_dim_or_zero(embeddings)
+    os.makedirs(PERSIST_DIR, exist_ok=True)
+    client = chromadb.PersistentClient(path=PERSIST_DIR, settings=Settings(anonymized_telemetry=False))
 
-    client_settings = Settings(anonymized_telemetry=False, is_persistent=True)
-    created = False
-    total = len(texts)
-    start = 0
-    while start < total:
-        end = min(start + BATCH_SIZE, total)
-        t_slice = texts[start:end]
-        m_slice = metas[start:end]
-        i_slice = ids[start:end]
-        print(f"Embedding batch {start}..{end-1}")
-
-        if not created:
-            db = Chroma.from_texts(
-                texts=t_slice,
-                embedding=embeddings,
-                metadatas=m_slice,
-                ids=i_slice,
-                persist_directory=DB_DIR,
-                client_settings=client_settings,
-                collection_name=COLLECTION,
-            )
-            created = True
-        else:
-            db._collection.add(documents=t_slice, metadatas=m_slice, ids=i_slice)
-        start = end
-
-    mf = write_manifest(chunks_total=total, dims=dims)
-
-    print(f"Persisted Chroma DB under: {DB_DIR}")
+    # Reset collection to avoid duplicates across runs
     try:
-        for root, dirs, files in os.walk(DB_DIR):
-            for f in files:
-                print(os.path.join(root, f))
-    except Exception as e:
-        print(f"WARN: listing {DB_DIR} failed: {e}")
-    print(f"[DONE] Embedded {total} chunk(s). Manifest: {mf}")
+        client.delete_collection(COLLECTION)
+    except Exception:
+        pass
+    try:
+        col = client.create_collection(COLLECTION, metadata={"hnsw:space":"cosine"})
+    except TypeError:
+        # older API signature
+        col = client.create_collection(name=COLLECTION, metadata={"hnsw:space":"cosine"})
 
+    model = SentenceTransformer(MODEL_NAME)
+
+    total = 0
+    B = BATCH_SIZE
+    for s in range(0, len(docs), B):
+        batch_docs  = docs[s:s+B]
+        batch_ids   = ids[s:s+B]
+        batch_metas_raw = metas_raw[s:s+B]
+
+        # Sanitize metadatas to satisfy Chroma's validator
+        batch_metas = [sanitize_metadata(m, doc_id=did, idx=(s+i))
+                       for i, (m, did) in enumerate(zip(batch_metas_raw, batch_ids))]
+
+        emb = model.encode(batch_docs, normalize_embeddings=True, show_progress_bar=False)
+        col.add(ids=batch_ids,
+                documents=batch_docs,
+                metadatas=batch_metas,
+                embeddings=emb.tolist())
+        total += len(batch_docs)
+
+    # MANIFEST
+    manifest = {
+        "collection": COLLECTION,
+        "embed_model": MODEL_NAME,
+        "count": total,
+        "source_index": os.path.abspath(INDEX_PATH),
+        "source_sha": SRC_SHA,
+        "source_ref": SRC_REF,
+        "source_repo": SRC_REPO,
+    }
+    with open(os.path.join(PERSIST_DIR, "MANIFEST.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    # Sanity: list collections
+    names=[]
+    for c in client.list_collections():
+        n = getattr(c,"name",None) or (isinstance(c,dict) and c.get("name"))
+        if n: names.append(n)
+    print(f"::notice :: Built Chroma at '{PERSIST_DIR}' | collection='{COLLECTION}' | chunks={total} | collections={names}")
 
 if __name__ == "__main__":
-    import os
     main()
