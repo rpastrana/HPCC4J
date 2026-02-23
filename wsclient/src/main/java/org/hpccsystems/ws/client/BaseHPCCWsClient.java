@@ -71,6 +71,7 @@ public abstract class BaseHPCCWsClient extends DataSingleton
     protected Double              targetESPInterfaceVer  = null;
     protected Boolean             targetsContainerizedHPCC = null;
     protected Boolean             targetHPCCAuthenticates = null;
+    private int x = 0;
 
     @WithSpan
     public boolean doesTargetHPCCAuthenticate() throws Exception
