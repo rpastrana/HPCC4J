@@ -6,11 +6,11 @@ on:
       - "master"
       - "candidate-*"
     paths:
-      - 'pom.xml'
       - '**/pom.xml'
       - '**/src/**/*.java'
       - '**/src/**/*.properties'
       - '**/src/**/*.xml'
+      - '**/src/**/*.ecl'
       - '.github/workflows/baremetal-regression-suite.yml'
 
   workflow_dispatch:

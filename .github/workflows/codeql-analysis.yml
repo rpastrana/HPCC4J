@@ -15,18 +15,18 @@ on:
   push:
     branches: [ "master", "candidate-*" ]
     paths:
-      - 'pom.xml'
       - '**/pom.xml'
       - '**/src/**/*.java'
+      - '**/src/**/*.ecl'
       - '.github/workflows/codeql-analysis.yml'
   pull_request:
     branches: [ "master", "candidate-*" ]
     paths:
-      - 'pom.xml'
       - '**/pom.xml'
       - '**/src/**/*.java'
+      - '**/src/**/*.ecl'
       - '.github/workflows/codeql-analysis.yml'
-  schedule:  # Keep schedule without filters for comprehensive weekly scan
+  schedule:  # Weekly comprehensive scan for security vulnerabilities, even without code changes
     - cron: '21 15 * * 4'
 
 jobs:

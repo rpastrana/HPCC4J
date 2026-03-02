@@ -1,0 +1,97 @@
+name: hpcc4j Pull Request Build Tests
+
+on:
+  pull_request:
+    paths:
+      - '**/pom.xml'
+      - '**/src/**/*.java'
+      - '**/src/**/*.properties'
+      - '**/src/**/*.xml'
+      - '**/src/**/*.ecl'
+      - '.github/workflows/pr-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      build-success: ${{ steps.build.outcome == 'success' }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        fetch-depth: 0
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+
+    # speed things up with caching from https://docs.github.com/en/actions/guides/building-and-testing-java-with-maven
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build with Maven
+      id: build
+      run: mvn -B package --file pom.xml
+
+    # Expect a failure here, verifying that the test suite fails early on init issues
+    - name: Test Suite Verification
+      run: "! mvn test --activate-profiles jenkins-on-demand -Dhpccconn=https://bad_host:8010"
+
+  javadoc-test:
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.build-success == 'true'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+
+    - name: Build Javadoc
+      run: mvn -B -Dmaven.test.skip=true clean javadoc:javadoc
+
+  trigger-k8s-regression:
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.build-success == 'true'
+    steps:
+    - name: Trigger K8s Regression Suite
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'k8s-regression-suite.yml',
+            ref: context.payload.pull_request.head.ref
+          });
+
+  trigger-baremetal-regression:
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.build-success == 'true'
+    steps:
+    - name: Trigger Baremetal Regression Suite
+      uses: actions/github-script@v7
+      with:
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'baremetal-regression-suite.yml',
+            ref: context.payload.pull_request.head.ref
+          });
