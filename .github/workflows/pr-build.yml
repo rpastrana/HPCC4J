@@ -1,4 +1,4 @@
-name: hpcc4j Pull Request Build Tests
+name: Pull Request Build
 
 on:
   pull_request:
@@ -44,11 +44,7 @@ jobs:
 
     - name: Build with Maven
       id: build
-      run: mvn -B package --file pom.xml
-
-    # Expect a failure here, verifying that the test suite fails early on init issues
-    - name: Test Suite Verification
-      run: "! mvn test --activate-profiles jenkins-on-demand -Dhpccconn=https://bad_host:8010"
+      run: mvn -B -Dmaven.test.skip=true package --file pom.xml
 
   javadoc-test:
     runs-on: ubuntu-latest

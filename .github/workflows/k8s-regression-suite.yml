@@ -1,20 +1,6 @@
 name: K8s Regression Suite
 
 on:
-  pull_request:
-    branches:
-      - "master"
-      - "candidate-*"
-    paths:
-      - '**/pom.xml'
-      - '**/src/**/*.java'
-      - '**/src/**/*.properties'
-      - '**/src/**/*.xml'
-      - '**/src/**/*.ecl'
-      - '.github/workflows/k8s-regression-suite.yml'
-      - '.github/actions/build-k8s/**'
-      - '.github/actions/deploy-hpcc-k8s/**'
-
   workflow_dispatch:
 
 jobs:

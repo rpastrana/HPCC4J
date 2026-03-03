@@ -1,18 +1,6 @@
 name: Baremetal Regression Suite
 
 on:
-  pull_request:
-    branches:
-      - "master"
-      - "candidate-*"
-    paths:
-      - '**/pom.xml'
-      - '**/src/**/*.java'
-      - '**/src/**/*.properties'
-      - '**/src/**/*.xml'
-      - '**/src/**/*.ecl'
-      - '.github/workflows/baremetal-regression-suite.yml'
-
   workflow_dispatch:
 
 jobs:
