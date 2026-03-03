@@ -53,6 +53,7 @@ import io.opentelemetry.semconv.ServerAttributes;
  */
 public abstract class BaseHPCCWsClient extends DataSingleton
 {
+    public int x =1;
     public static final String PROJECT_NAME = "WsClient";
     private static OpenTelemetry globalOTel = null;
     /** Constant <code>log</code> */
