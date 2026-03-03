@@ -63,7 +63,7 @@ public abstract class BaseHPCCWsClient extends DataSingleton
     public static final String    DEFAULTECLWATCHTLSPORT = "18010";
     /** Constant <code>DEFAULTSERVICEPORT="DEAFULTECLWATCHPORT"</code> */
     public static String          DEFAULTSERVICEPORT     = DEAFULTECLWATCHPORT;
-int x;
+
     protected Connection          wsconn                 = null;
     protected boolean             verbose                = false;
     protected String              initErrMessage         = "";
