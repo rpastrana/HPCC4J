@@ -2,6 +2,11 @@ name: K8s Regression Suite
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      head_sha:
+        required: false
+        type: string
 
 jobs:
   parse-pr-body:
@@ -126,7 +131,7 @@ jobs:
 
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.sha }}
+        ref: ${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
         fetch-depth: 0
 
     - name: Checkout HPCC-Platform

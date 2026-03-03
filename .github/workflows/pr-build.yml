@@ -2,6 +2,7 @@ name: Pull Request Build
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '**/pom.xml'
       - '**/src/**/*.java'
@@ -27,6 +28,7 @@ jobs:
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         fetch-depth: 0
+        fetch-tags: true
 
     - name: Set up JDK 11
       uses: actions/setup-java@v4
@@ -70,33 +72,21 @@ jobs:
       run: mvn -B -Dmaven.test.skip=true clean javadoc:javadoc
 
   trigger-k8s-regression:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/k8s-regression-suite.yml
     needs: build
     if: needs.build.outputs.build-success == 'true'
-    steps:
-    - name: Trigger K8s Regression Suite
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'k8s-regression-suite.yml',
-            ref: context.payload.pull_request.head.ref
-          });
+    with:
+      head_sha: ${{ github.event.pull_request.head.sha }}
 
   trigger-baremetal-regression:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/baremetal-regression-suite.yml
     needs: build
     if: needs.build.outputs.build-success == 'true'
-    steps:
-    - name: Trigger Baremetal Regression Suite
-      uses: actions/github-script@v7
-      with:
-        script: |
-          await github.rest.actions.createWorkflowDispatch({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: 'baremetal-regression-suite.yml',
-            ref: context.payload.pull_request.head.ref
-          });
+    with:
+      pull_request_number: ${{ github.event.pull_request.number }}
+      pull_request_title: ${{ github.event.pull_request.title }}
+      pull_request_author: ${{ github.event.pull_request.user.login }}
+      pull_url: ${{ github.event.pull_request.html_url }}
+      comments_url: ${{ github.event.pull_request.comments_url }}
+      base_ref: ${{ github.base_ref }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
