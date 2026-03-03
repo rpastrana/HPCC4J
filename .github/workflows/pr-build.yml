@@ -9,6 +9,13 @@ on:
       - '**/src/**/*.xml'
       - '**/src/**/*.ecl'
       - '.github/workflows/pr-build.yml'
+      - '.github/workflows/k8s-regression-suite.yml'
+      - '.github/workflows/baremetal-regression-suite.yml'
+      - '.github/actions/**'
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   build:
@@ -22,13 +29,14 @@ jobs:
         fetch-depth: 0
 
     - name: Set up JDK 11
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v4
       with:
         java-version: 11
+        distribution: 'temurin'
 
     # speed things up with caching from https://docs.github.com/en/actions/guides/building-and-testing-java-with-maven
     - name: Cache Maven packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -50,12 +58,13 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Setup JDK 11
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v4
       with:
         java-version: 11
+        distribution: 'temurin'
 
     - name: Cache Maven packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.m2
         key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
