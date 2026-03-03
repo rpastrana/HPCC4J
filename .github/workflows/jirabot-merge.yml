@@ -92,7 +92,7 @@ jobs:
                     print('Unable to extract version from git tag, process failed with status: ' + str(gitTagProcessStatus))
                     sys.exit(1)
 
-                latestGitTag = str(output)
+                latestGitTag = output.decode().strip()
 
                 versionMatch = versionPattern.match(latestGitTag)
                 if versionMatch:

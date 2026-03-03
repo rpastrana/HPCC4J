@@ -93,7 +93,7 @@ jobs:
                     print('Unable to retrieve latest git tag.')
                     sys.exit(1)
 
-                latestGitTag = str(output)
+                latestGitTag = output.decode().strip()
 
                 versionMatch = versionPattern.match(latestGitTag)
                 if versionMatch:
