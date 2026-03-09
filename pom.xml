@@ -65,6 +65,7 @@
     <excludedGroups>org.hpccsystems.commons.annotations.KnownServerIssueTests,org.hpccsystems.commons.annotations.UnverifiedServerIssues,org.hpccsystems.commons.annotations.UnverifiedClientIssues</excludedGroups>
     <codehaus.template.version>1.0.0</codehaus.template.version>
     <project.benchmarking>false</project.benchmarking>
+    <formatter.plugin.version>2.23.0</formatter.plugin.version>
     <opentelemetry.bom.version>1.38.0</opentelemetry.bom.version>
     <opentelemetry.semconv.version>1.25.0-alpha</opentelemetry.semconv.version>
     <opentelemetry.instrumentation.annotations.version>2.6.0</opentelemetry.instrumentation.annotations.version>
@@ -378,6 +379,21 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>net.revelc.code.formatter</groupId>
+          <artifactId>formatter-maven-plugin</artifactId>
+          <version>${formatter.plugin.version}</version>
+          <configuration>
+            <configFile>${maven.multiModuleProjectDirectory}/eclipse/HPCC-JAVA-Formatter.xml</configFile>
+            <encoding>${project.build.sourceEncoding}</encoding>
+            <excludes>
+              <exclude>org/hpccsystems/ws/client/gen/**/*.java</exclude>
+              <exclude>org/hpccsystems/ws/client/antlr/**/*.java</exclude>
+              <exclude>org/hpccsystems/ws/client/wrappers/gen/**/*.java</exclude>
+              <exclude>org/hpccsystems/ws/client/extended/**/*.java</exclude>
+            </excludes>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
