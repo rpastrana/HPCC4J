@@ -10,7 +10,10 @@ on:
       - '**/src/**/*.properties'
       - '**/src/**/*.xml'
       - '**/src/**/*.ecl'
+      - 'eclipse/HPCC-JAVA-Formatter.xml'
+      - 'scripts/check-format-eclipse.*'
       - '.github/workflows/pr-action-orchestrator.yml'
+      - '.github/workflows/java-format-check.yml'
       - '.github/workflows/k8s-regression-suite.yml'
       - '.github/workflows/baremetal-regression-suite.yml'
       - '.github/workflows/javadoc-test.yml'
@@ -48,6 +51,13 @@ jobs:
     - name: Build with Maven
       id: build
       run: mvn -B -Dmaven.test.skip=true package --file pom.xml
+
+  trigger-format-check:
+    uses: ./.github/workflows/java-format-check.yml
+    needs: build
+    if: needs.build.outputs.build-success == 'true'
+    with:
+      head_sha: ${{ github.event.pull_request.head.sha }}
 
   trigger-javadoc-test:
     uses: ./.github/workflows/javadoc-test.yml
