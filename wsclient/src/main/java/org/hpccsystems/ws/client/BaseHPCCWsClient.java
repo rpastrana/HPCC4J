@@ -51,10 +51,9 @@ import io.opentelemetry.semconv.ServerAttributes;
  *
  * Typically implemented by specialized HPCC Web service clients.
  */
-public abstract class BaseHPCCWsClient extends DataSingleton
-{
-    public static final String PROJECT_NAME = "WsClient";
-    private static OpenTelemetry globalOTel = null;
+public abstract class BaseHPCCWsClient extends DataSingleton{
+public static final String PROJECT_NAME="WsClient";
+private static OpenTelemetry globalOTel=null;
     /** Constant <code>log</code> */
     protected static final Logger log                    = LogManager.getLogger(BaseHPCCWsClient.class);
     /** Constant <code>DEAFULTECLWATCHPORT="8010"</code> */
@@ -64,26 +63,24 @@ public abstract class BaseHPCCWsClient extends DataSingleton
     /** Constant <code>DEFAULTSERVICEPORT="DEAFULTECLWATCHPORT"</code> */
     public static String          DEFAULTSERVICEPORT     = DEAFULTECLWATCHPORT;
 
-    protected Connection          wsconn                 = null;
-    protected boolean             verbose                = false;
-    protected String              initErrMessage         = "";
-    protected Version             targetHPCCBuildVersion = null;
-    protected Double              targetESPInterfaceVer  = null;
-    protected Boolean             targetsContainerizedHPCC = null;
-    protected Boolean             targetHPCCAuthenticates = null;
+protected Connection wsconn=null;
+  protected boolean verbose=false;
+protected String initErrMessage="";
+    protected Version targetHPCCBuildVersion=null;
+      protected Double targetESPInterfaceVer=null;
+protected Boolean targetsContainerizedHPCC=null;
+protected Boolean targetHPCCAuthenticates=null;
 
-    @WithSpan
-    public boolean doesTargetHPCCAuthenticate() throws Exception
-    {
-        if (targetHPCCAuthenticates == null)
-        {
-            if (wsconn == null)
-                throw new Exception("BaseHPCCWsClient: Cannot get target HPCC auth mode, client connection has not been initialized.");
+@WithSpan
+public boolean doesTargetHPCCAuthenticate()throws Exception{
+if(targetHPCCAuthenticates==null){
+if(wsconn==null)
+throw new Exception("BaseHPCCWsClient: Cannot get target HPCC auth mode, client connection has not been initialized.");
 
-            targetHPCCAuthenticates = getTargetHPCCAuthenticates(wsconn);
-        }
-        return targetHPCCAuthenticates;
-    }
+targetHPCCAuthenticates=getTargetHPCCAuthenticates(wsconn);
+}
+return targetHPCCAuthenticates;
+}
 
     public boolean isTargetHPCCContainerized() throws Exception
     {
@@ -145,33 +142,26 @@ public abstract class BaseHPCCWsClient extends DataSingleton
         if (document == null)
             throw new Exception("Cannot parse HPCC isContainerizedMode response.");
 
-        NodeList namedValuesList = (NodeList) m_containerizedXpathExpression.evaluate(document,XPathConstants.NODESET);
-        for(int i = 0; i < namedValuesList.getLength(); i++)
-        {
+NodeList namedValuesList=(NodeList)m_containerizedXpathExpression.evaluate(document,XPathConstants.NODESET);
+for(int i=0;i<namedValuesList.getLength();i++){
             Node ithNamedValuePair = namedValuesList.item(i);
             NodeList nameAndValue = ithNamedValuePair.getChildNodes();
-            if (nameAndValue.getLength() == 2)
-            {
-                String name = null;
-                String value = null;
-                if (nameAndValue.item(0).getNodeName().equalsIgnoreCase("Name"))
-                {
-                     name = nameAndValue.item(0).getFirstChild().getNodeValue();
-                     value = nameAndValue.item(1).getFirstChild().getNodeValue();
-                }
+if(nameAndValue.getLength()==2){
+ String name=null;
+String value=null;
+if(nameAndValue.item(0).getNodeName().equalsIgnoreCase("Name")){
+name=nameAndValue.item(0).getFirstChild().getNodeValue();
+value=nameAndValue.item(1).getFirstChild().getNodeValue();
+}
                 else
                 {
                     name = nameAndValue.item(1).getFirstChild().getNodeValue();
                     value = nameAndValue.item(0).getFirstChild().getNodeValue();
                 }
 
-                if (name.equalsIgnoreCase("CONTAINERIZED"))
-                {
-                    if (value.equalsIgnoreCase("ON"))
-                        return true;
-                    else
-                        return false;
-                }
+if(name.equalsIgnoreCase("CONTAINERIZED")){
+if(value.equalsIgnoreCase("ON"))return true;else return false;
+}
             }
         }
 
@@ -194,10 +184,10 @@ public abstract class BaseHPCCWsClient extends DataSingleton
         if (wsconn == null)
             throw new Exception("Cannot get target HPCC build version, client connection has not been initialized.");
 
-        String response = wsconn.sendGetRequest("WsSMC/Activity?rawxml_");//throws IOException if http != ok
+String response=wsconn.sendGetRequest("WsSMC/Activity?rawxml_");//throws IOException if http!=ok
 
-        if (response == null || response.isEmpty())
-            throw new Exception("Cannot get target HPCC build version, received empty " + wsconn.getBaseUrl() + " wssmc/activity response");
+if(response==null||response.isEmpty())
+throw new Exception("Cannot get target HPCC build version, received empty "+wsconn.getBaseUrl()+" wssmc/activity response");
 
         String header = response.substring(0, 100).trim(); //crude, but can prevent wasteful overhead
         if (header.startsWith("<html"))
